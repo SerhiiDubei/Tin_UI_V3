@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
+import ProjectsPage from './pages/ProjectsPage';
+import SessionsPage from './pages/SessionsPage';
+import GeneratePageV3 from './pages/GeneratePageV3';
+import GalleryPage from './pages/GalleryPage';
 import GeneratePage from './pages/GeneratePage';
 import SwipePage from './pages/SwipePage';
 import DashboardPage from './pages/DashboardPage';
@@ -52,12 +56,20 @@ function Navigation() {
 
         <div className={`nav-links ${menuOpen ? 'nav-links-open' : ''}`}>
           <Link
+            to="/projects"
+            className={`nav-link ${isActive('/projects') || location.pathname.startsWith('/projects') ? 'nav-link-active' : ''}`}
+            onClick={closeMenu}
+          >
+            <span className="nav-icon">📁</span>
+            <span>Projects</span>
+          </Link>
+          <Link
             to="/generate"
             className={`nav-link ${isActive('/generate') ? 'nav-link-active' : ''}`}
             onClick={closeMenu}
           >
             <span className="nav-icon">🎨</span>
-            <span>Generate</span>
+            <span>Generate (V2)</span>
           </Link>
           <Link
             to="/swipe"
@@ -65,7 +77,7 @@ function Navigation() {
             onClick={closeMenu}
           >
             <span className="nav-icon">👆</span>
-            <span>Swipe</span>
+            <span>Swipe (V2)</span>
           </Link>
           <Link
             to="/dashboard"
@@ -121,11 +133,49 @@ function AppContent() {
             path="/"
             element={
               <ProtectedRoute>
-                <Navigate to="/generate" replace />
+                <Navigate to="/projects" replace />
               </ProtectedRoute>
             }
           />
           
+          {/* V3 Routes - Projects/Sessions */}
+          <Route
+            path="/projects"
+            element={
+              <ProtectedRoute>
+                <ProjectsPage />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/projects/:projectId/sessions"
+            element={
+              <ProtectedRoute>
+                <SessionsPage />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/projects/:projectId/sessions/:sessionId/generate"
+            element={
+              <ProtectedRoute>
+                <GeneratePageV3 />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/projects/:projectId/sessions/:sessionId/gallery"
+            element={
+              <ProtectedRoute>
+                <GalleryPage />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* V2 Routes (legacy) */}
           <Route
             path="/generate"
             element={

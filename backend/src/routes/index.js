@@ -4,6 +4,9 @@ import ratingsRoutes from './ratings.routes.js';
 import insightsRoutes from './insights.routes.js';
 import authRoutes from './auth.routes.js';
 import adminRoutes from './admin.routes.js';
+import projectsRoutes from './projects.routes.js';
+import sessionsRoutes from './sessions.routes.js';
+import generationRoutes from './generation.routes.js';
 
 const router = express.Router();
 
@@ -12,11 +15,17 @@ router.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    service: 'Tinder AI Feedback API'
+    service: 'Tin_UI_V3 API',
+    version: '3.0.0'
   });
 });
 
-// Mount routes
+// V3 Routes
+router.use('/projects', projectsRoutes);
+router.use('/sessions', sessionsRoutes);
+router.use('/generation', generationRoutes);
+
+// V2 Routes (legacy support)
 router.use('/content', contentRoutes);
 router.use('/ratings', ratingsRoutes);
 router.use('/insights', insightsRoutes);

@@ -41,6 +41,10 @@ export const config = {
     apiKey: process.env.OPENAI_API_KEY
   },
   
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || 'AIzaSyC4l1mFJNJEqB-i279aifZ3e7tTH_7VD8M'
+  },
+  
   cors: {
     origins: process.env.CORS_ORIGINS 
       ? process.env.CORS_ORIGINS.split(',')

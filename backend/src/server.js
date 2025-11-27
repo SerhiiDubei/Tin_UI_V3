@@ -12,7 +12,9 @@ const app = express();
 // Middleware
 app.use(cors({
   origin: config.cors.origins,
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -48,8 +50,10 @@ async function startServer() {
     const connected = await testConnection();
     
     if (!connected) {
-      console.error('❌ Failed to connect to database. Check your SUPABASE credentials.');
-      process.exit(1);
+      console.warn('⚠️  Failed to connect to database. Server will start but DB operations will fail.');
+      console.warn('   To fix: Apply migrations at https://ffnmlfnzufddmecfpive.supabase.co');
+    } else {
+      console.log('✅ Database connected successfully!');
     }
     
     // Initialize storage bucket

@@ -280,6 +280,60 @@
   color: #999;
 }
 
+/* Swipe Action Buttons */
+.swipe-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px;
+  background: white;
+  border-top: 1px solid #eee;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+}
+
+.swipe-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.swipe-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.swipe-btn:active {
+  transform: scale(0.95);
+}
+
+.swipe-btn-dislike {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+}
+
+.swipe-btn-skip {
+  background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+}
+
+.swipe-btn-like {
+  background: linear-gradient(135deg, #51cf66 0%, #37b24d 100%);
+}
+
+.swipe-btn-superlike {
+  background: linear-gradient(135deg, #ffd700 0%, #ffa500 100%);
+}
+
 /* Mobile responsive */
 @media (max-width: 768px) {
   .swipe-container {
@@ -301,5 +355,16 @@
   .instruction {
     font-size: 12px;
     padding: 6px 12px;
+  }
+
+  .swipe-buttons {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .swipe-btn {
+    width: 56px;
+    height: 56px;
+    font-size: 24px;
   }
 }

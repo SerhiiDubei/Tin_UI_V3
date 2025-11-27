@@ -9,6 +9,7 @@ export const MODELS_CONFIG = {
       description: 'High-quality images with native 2K resolution',
       price: '$0.03',
       speed: 'Середньо (~1 хв)',
+      provider: 'replicate',
       replicateId: 'bytedance/seedream-4',
       version: 'latest',
       isDefault: true,
@@ -16,6 +17,18 @@ export const MODELS_CONFIG = {
         width: 2048,
         height: 2048,
         num_inference_steps: 4
+      }
+    },
+    'nano-banana-pro': {
+      name: 'Nano Banana Pro',
+      description: 'SOTA image generation and editing with Gemini',
+      price: '$0.025',
+      speed: 'Швидко (~45 сек)',
+      provider: 'genspark',
+      model: 'nano-banana-pro',
+      params: {
+        aspect_ratio: '1:1',
+        image_size: 'auto'
       }
     },
     'flux-schnell': {

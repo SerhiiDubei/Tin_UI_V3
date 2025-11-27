@@ -1,7 +1,7 @@
 {
-  "name": "tinder-ai-feedback",
-  "version": "1.0.0",
-  "description": "AI Feedback Platform with Tinder-like UI",
+  "name": "tin-ui-v3",
+  "version": "3.0.0",
+  "description": "AI Feedback Platform V3 - Universal Weight Learning System",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -11,16 +11,20 @@
     "dev:frontend": "cd frontend && npm start",
     "dev:backend": "cd backend && npm run dev",
     "build:frontend": "cd frontend && npm run build",
-    "start:backend": "cd backend && npm start"
+    "start:backend": "cd backend && npm start",
+    "db:migrate": "echo 'Run migration in Supabase SQL Editor: database/migrations/002_v3_architecture.sql'",
+    "test:api": "curl http://localhost:5000/api/health"
   },
   "keywords": [
     "ai",
     "feedback",
     "tinder",
     "swipe",
-    "machine-learning"
+    "machine-learning",
+    "weight-learning",
+    "dynamic-parameters"
   ],
-  "author": "Your Name",
+  "author": "Serhii Dubei",
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.2.2"

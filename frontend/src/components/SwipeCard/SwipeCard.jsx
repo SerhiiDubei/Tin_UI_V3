@@ -182,6 +182,38 @@ const SwipeCard = ({ content, onSwipe }) => {
           </div>
         )}
       </div>
+
+      {/* Swipe Action Buttons */}
+      <div className="swipe-buttons">
+        <button
+          className="swipe-btn swipe-btn-dislike"
+          onClick={() => onSwipe('left')}
+          title="Dislike"
+        >
+          👎
+        </button>
+        <button
+          className="swipe-btn swipe-btn-skip"
+          onClick={() => onSwipe('down')}
+          title="Skip"
+        >
+          ⏭️
+        </button>
+        <button
+          className="swipe-btn swipe-btn-like"
+          onClick={() => onSwipe('right')}
+          title="Like"
+        >
+          👍
+        </button>
+        <button
+          className="swipe-btn swipe-btn-superlike"
+          onClick={() => onSwipe('up')}
+          title="Superlike"
+        >
+          ⭐
+        </button>
+      </div>
     </div>
   );
 };

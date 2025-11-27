@@ -1,0 +1,19 @@
+module.exports = {
+  apps: [
+    {
+      name: 'frontend-v3',
+      script: 'npx',
+      args: 'serve -s build -l 3000',
+      cwd: '/home/user/webapp/frontend',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3000
+      },
+      watch: false,
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      max_restarts: 10
+    }
+  ]
+};
