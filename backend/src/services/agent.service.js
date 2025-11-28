@@ -21,7 +21,7 @@ const openai = new OpenAI({
  * @param {string} category - Category tag from project
  * @returns {Object} Enhanced prompt ready for generation
  */
-export async function buildPromptFromParameters(userPrompt, selectedParams, agentType = 'general', category = null) {
+export async function buildPromptFromParameters(userPrompt, selectedParams, agentType = 'general', category = null, sessionId = null) {
   console.log('\n🤖 BUILDING PROMPT WITH AGENT');
   console.log('Agent Type:', agentType);
   console.log('Category:', category);
@@ -49,6 +49,18 @@ export async function buildPromptFromParameters(userPrompt, selectedParams, agen
     console.log('\n📝 PARAMETER DESCRIPTION:');
     console.log(parameterDescription);
     
+    // 🔥 LOAD COMMENTS FROM PREVIOUS RATINGS (method.txt)
+    let commentsSection = '';
+    if (sessionId) {
+      const commentsResult = await loadSessionComments(sessionId);
+      if (commentsResult.success && commentsResult.comments.length > 0) {
+        console.log('\n💬 PREVIOUS COMMENTS LOADED:', commentsResult.comments.length);
+        commentsSection = buildCommentsSection(commentsResult.comments);
+      } else {
+        console.log('\n💬 No previous comments found');
+      }
+    }
+    
     // Build final prompt using AI
     const messages = [
       {
@@ -62,7 +74,7 @@ export async function buildPromptFromParameters(userPrompt, selectedParams, agen
 USER REQUEST: ${userPrompt}
 
 PARAMETER CONSTRAINTS (selected by AI based on user preferences):
-${parameterDescription}
+${parameterDescription}${commentsSection}
 
 IMPORTANT:
 - Combine user request with parameter constraints naturally
@@ -70,7 +82,7 @@ IMPORTANT:
 - Don't mention technical parameters explicitly
 - Create flowing, natural description
 - For dating: follow Seedream 4.0 style (smartphone photo realism)
-- For other categories: adapt style appropriately
+- For other categories: adapt style appropriately${commentsSection ? '\n- 🔥 CRITICAL: Apply user feedback from comments above (HIGH PRIORITY!)' : ''}
 
 Return ONLY the final prompt text, nothing else.`
       }
@@ -343,6 +355,77 @@ export async function analyzeSessionHistory(sessionId) {
       error: error.message
     };
   }
+}
+
+/**
+ * Load all rated content with comments from session
+ * @param {string} sessionId 
+ * @returns {Object} { success, comments: [{ rating, comment, prompt }] }
+ */
+async function loadSessionComments(sessionId) {
+  try {
+    const { data: content, error } = await supabase
+      .from('content_v3')
+      .select('rating, comment, original_prompt, enhanced_prompt')
+      .eq('session_id', sessionId)
+      .not('comment', 'is', null)
+      .not('rating', 'is', null)
+      .order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    
+    const comments = content.map(item => ({
+      rating: item.rating,
+      comment: item.comment,
+      prompt: item.original_prompt || item.enhanced_prompt
+    }));
+    
+    return {
+      success: true,
+      comments
+    };
+  } catch (error) {
+    console.error('Error loading session comments:', error);
+    return {
+      success: false,
+      comments: [],
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Build comments section for GPT-4o prompt
+ * @param {Array} comments 
+ * @returns {string}
+ */
+function buildCommentsSection(comments) {
+  if (!comments || comments.length === 0) return '';
+  
+  const positive = comments.filter(c => c.rating > 0);
+  const negative = comments.filter(c => c.rating < 0);
+  
+  let section = '\n\n🔥 USER FEEDBACK (Previous ratings with comments):';
+  
+  if (positive.length > 0) {
+    section += '\n\n✅ WHAT USER LIKES (incorporate these):';
+    positive.forEach((c, i) => {
+      const intensity = c.rating >= 3 ? '(LOVES IT!)' : '(likes)';
+      section += `\n  ${i + 1}. ${intensity} "${c.comment}"`;
+      if (c.prompt) section += ` [from: "${c.prompt.substring(0, 50)}..."]`;
+    });
+  }
+  
+  if (negative.length > 0) {
+    section += '\n\n❌ WHAT USER DISLIKES (avoid these):';
+    negative.forEach((c, i) => {
+      const intensity = c.rating <= -3 ? '(HATES IT!)' : '(dislikes)';
+      section += `\n  ${i + 1}. ${intensity} "${c.comment}"`;
+      if (c.prompt) section += ` [from: "${c.prompt.substring(0, 50)}..."]`;
+    });
+  }
+  
+  return section;
 }
 
 export default {

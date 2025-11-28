@@ -21,14 +21,16 @@ export const MODELS_CONFIG = {
     },
     'nano-banana-pro': {
       name: 'Nano Banana Pro',
-      description: 'SOTA image generation and editing with Gemini',
+      description: 'Google\'s SOTA image generation with Gemini 3 Pro',
       price: '$0.025',
       speed: 'Швидко (~45 сек)',
-      provider: 'genspark',
-      model: 'nano-banana-pro',
+      provider: 'replicate',
+      replicateId: 'google/nano-banana-pro',
+      version: 'latest',
       params: {
-        aspect_ratio: '1:1',
-        image_size: 'auto'
+        width: 1024,
+        height: 1024,
+        num_inference_steps: 20
       }
     },
     'flux-schnell': {

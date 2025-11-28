@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { projectsAPI, sessionsAPI } from '../services/api-v3';
@@ -8,21 +8,17 @@ import Loading from '../components/Loading';
 import './SessionsPage.css';
 
 function SessionsPage() {
+  const { user } = useAuth();
   const [project, setProject] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newSession, setNewSession] = useState({ name: '' });
-  const { user } = useAuth();
   const { projectId } = useParams();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadProjectAndSessions();
-  }, [projectId]);
-
-  const loadProjectAndSessions = async () => {
+  const loadProjectAndSessions = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -42,7 +38,11 @@ function SessionsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
+
+  useEffect(() => {
+    loadProjectAndSessions();
+  }, [loadProjectAndSessions]);
 
   const handleCreateSession = async () => {
     if (!newSession.name.trim()) {
@@ -52,17 +52,20 @@ function SessionsPage() {
 
     try {
       const response = await sessionsAPI.create({
-        project_id: projectId,
+        projectId: projectId,  // Backend очікує camelCase
+        userId: user.id,       // Backend вимагає userId
         name: newSession.name
       });
 
       if (response.success) {
-        setSessions([response.data, ...sessions]);
+        // Backend повертає { data: { session, parameters, weights } }
+        const createdSession = response.data.session || response.data;
+        setSessions([createdSession, ...sessions]);
         setShowCreateModal(false);
         setNewSession({ name: '' });
         
         // Navigate to generation page
-        navigate(`/projects/${projectId}/sessions/${response.data.id}/generate`);
+        navigate(`/projects/${projectId}/sessions/${createdSession.id}/generate`);
       }
     } catch (err) {
       alert('Помилка створення сесії: ' + err.message);
@@ -188,21 +191,21 @@ function SessionsPage() {
                   <div className="stat-item">
                     <span className="stat-icon">🖼️</span>
                     <div>
-                      <div className="stat-value">{session.content_count || 0}</div>
+                      <div className="stat-value">{session.generations_count || 0}</div>
                       <div className="stat-label">Контенту</div>
                     </div>
                   </div>
                   <div className="stat-item">
                     <span className="stat-icon">⭐</span>
                     <div>
-                      <div className="stat-value">{session.rating_count || 0}</div>
+                      <div className="stat-value">{session.ratings_count || 0}</div>
                       <div className="stat-label">Оцінок</div>
                     </div>
                   </div>
                   <div className="stat-item">
                     <span className="stat-icon">📊</span>
                     <div>
-                      <div className="stat-value">{session.parameter_count || 0}</div>
+                      <div className="stat-value">{session.parameters_count || 0}</div>
                       <div className="stat-label">Параметрів</div>
                     </div>
                   </div>
@@ -223,12 +226,21 @@ function SessionsPage() {
                   >
                     🖼️ Галерея
                   </Button>
+                  {session.ratings_count > 0 && (
+                    <Button
+                      onClick={() => navigate(`/projects/${projectId}/sessions/${session.id}/weights`)}
+                      variant="secondary"
+                      size="small"
+                    >
+                      📊 Ваги
+                    </Button>
+                  )}
                   <Button
                     onClick={() => navigate(`/projects/${projectId}/sessions/${session.id}/generate`)}
                     variant="primary"
                     size="small"
                   >
-                    {session.content_count > 0 ? '▶️ Продовжити' : '🚀 Почати'} →
+                    {session.generations_count > 0 ? '▶️ Продовжити' : '🚀 Почати'} →
                   </Button>
                 </div>
               </Card>

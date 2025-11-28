@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { projectsAPI } from '../services/api-v3';
@@ -20,11 +20,7 @@ function ProjectsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     try {
       setLoading(true);
       const response = await projectsAPI.getAll(user.id);
@@ -36,7 +32,11 @@ function ProjectsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user.id]);
+
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
 
   const handleCreateProject = async () => {
     if (!newProject.name.trim() || !newProject.category.trim()) {
@@ -46,9 +46,9 @@ function ProjectsPage() {
 
     try {
       const response = await projectsAPI.create({
-        user_id: user.id,
+        userId: user.id,  // Backend очікує camelCase 'userId'
         name: newProject.name,
-        category: newProject.category,
+        tag: newProject.category,
         description: newProject.description
       });
 
@@ -56,6 +56,9 @@ function ProjectsPage() {
         setProjects([response.data, ...projects]);
         setShowCreateModal(false);
         setNewProject({ name: '', category: '', description: '' });
+        
+        // Перехід до Sessions після створення проєкту
+        navigate(`/projects/${response.data.id}/sessions`);
       }
     } catch (err) {
       alert('Помилка створення проєкту: ' + err.message);
@@ -139,17 +142,17 @@ function ProjectsPage() {
                 <div className="project-stats">
                   <div className="stat-item">
                     <span className="stat-icon">📊</span>
-                    <span className="stat-value">{project.session_count || 0}</span>
+                    <span className="stat-value">{project.sessions_count || 0}</span>
                     <span className="stat-label">Сесій</span>
                   </div>
                   <div className="stat-item">
                     <span className="stat-icon">🖼️</span>
-                    <span className="stat-value">{project.content_count || 0}</span>
+                    <span className="stat-value">{project.generations_count || 0}</span>
                     <span className="stat-label">Контенту</span>
                   </div>
                   <div className="stat-item">
                     <span className="stat-icon">⭐</span>
-                    <span className="stat-value">{project.rating_count || 0}</span>
+                    <span className="stat-value">{project.ratings_count || 0}</span>
                     <span className="stat-label">Оцінок</span>
                   </div>
                 </div>

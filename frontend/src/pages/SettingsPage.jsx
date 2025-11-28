@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { insightsAPI } from '../services/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { projectsAPI, sessionsAPI } from '../services/api-v3';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -9,49 +9,66 @@ import './SettingsPage.css';
 function SettingsPage() {
   const { user } = useAuth();
   const [userId] = useState(user?.id || 'demo-user-123');
-  const [userInsights, setUserInsights] = useState(null);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    loadUserInsights();
+  const loadUserStats = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Завантажити всі проекти користувача
+      const projectsResponse = await projectsAPI.getAll(userId);
+      
+      if (projectsResponse.success) {
+        const projects = projectsResponse.data;
+        
+        let totalSessions = 0;
+        let totalGenerations = 0;
+        let totalRatings = 0;
+        let positiveRatings = 0;
+        let negativeRatings = 0;
+        
+        // Підрахувати статистику з кожного проекту
+        for (const project of projects) {
+          totalSessions += project.sessions_count || 0;
+          totalGenerations += project.generations_count || 0;
+          totalRatings += project.ratings_count || 0;
+          
+          // Отримати деталі сесій для підрахунку позитивних/негативних оцінок
+          const sessionsResponse = await sessionsAPI.getByProject(project.id);
+          if (sessionsResponse.success) {
+            for (const session of sessionsResponse.data) {
+              // Можна додатково підрахувати позитивні/негативні з content_v3
+              // Але це потребує додаткового API
+            }
+          }
+        }
+        
+        setStats({
+          totalProjects: projects.length,
+          totalSessions,
+          totalGenerations,
+          totalRatings,
+          positiveRatings,
+          negativeRatings,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load user stats:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [userId]);
 
-  const loadUserInsights = async () => {
-    try {
-      setLoading(true);
-      const response = await insightsAPI.getUser(userId);
-      setUserInsights(response.data);
-    } catch (err) {
-      console.error('Failed to load user insights:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-
-  const handleResetInsights = async () => {
-    if (!window.confirm('Are you sure you want to reset your insights? This will clear all your preferences.')) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      // In a real implementation, you'd call an API endpoint to clear insights
-      alert('Insights reset functionality would be implemented here');
-      await loadUserInsights();
-    } catch (err) {
-      console.error('Failed to reset insights:', err);
-      alert('Failed to reset insights');
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    loadUserStats();
+  }, [loadUserStats]);
 
   const handleExportData = () => {
     const data = {
       userId,
-      userInsights,
+      stats,
       exportedAt: new Date().toISOString()
     };
     
@@ -59,7 +76,7 @@ function SettingsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tinder-ai-data-${userId}-${Date.now()}.json`;
+    a.download = `tin-ai-data-${userId}-${Date.now()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -81,83 +98,88 @@ function SettingsPage() {
           </div>
         </Card>
 
-        {/* Insights Summary */}
-        <Card title="💡 Your Insights Summary" className="settings-card">
+        {/* Stats Summary */}
+        <Card title="📊 Ваша статистика" className="settings-card">
           {loading ? (
-            <Loading size="small" text="Loading insights..." />
-          ) : userInsights ? (
+            <Loading size="small" text="Завантаження статистики..." />
+          ) : stats ? (
             <div className="insights-summary">
               <div className="insight-stat">
-                <span className="stat-label">Total Swipes:</span>
-                <span className="stat-value">{userInsights.totalSwipes || 0}</span>
+                <span className="stat-label">Проектів:</span>
+                <span className="stat-value">{stats.totalProjects || 0}</span>
               </div>
               <div className="insight-stat">
-                <span className="stat-label">Likes Tracked:</span>
-                <span className="stat-value">{userInsights.likes?.length || 0}</span>
+                <span className="stat-label">Сесій:</span>
+                <span className="stat-value">{stats.totalSessions || 0}</span>
               </div>
               <div className="insight-stat">
-                <span className="stat-label">Dislikes Tracked:</span>
-                <span className="stat-value">{userInsights.dislikes?.length || 0}</span>
+                <span className="stat-label">Згенеровано:</span>
+                <span className="stat-value">{stats.totalGenerations || 0}</span>
               </div>
               <div className="insight-stat">
-                <span className="stat-label">Last Updated:</span>
+                <span className="stat-label">Оцінок:</span>
+                <span className="stat-value">{stats.totalRatings || 0}</span>
+              </div>
+              <div className="insight-stat">
+                <span className="stat-label">Оновлено:</span>
                 <span className="stat-value">
-                  {userInsights.updatedAt
-                    ? new Date(userInsights.updatedAt).toLocaleString()
-                    : 'Never'}
+                  {stats.updatedAt
+                    ? new Date(stats.updatedAt).toLocaleString('uk-UA')
+                    : 'Ніколи'}
                 </span>
               </div>
             </div>
           ) : (
-            <p className="empty-message">No insights available yet. Start swiping to build your profile!</p>
+            <p className="empty-message">Немає даних. Почніть генерувати контент!</p>
           )}
         </Card>
 
         {/* Data Management */}
-        <Card title="📊 Data Management" className="settings-card">
+        <Card title="📊 Управління даними" className="settings-card">
           <div className="setting-group">
             <div className="action-buttons">
               <Button 
                 variant="secondary" 
                 onClick={handleExportData}
-                disabled={!userInsights}
+                disabled={!stats}
               >
-                📥 Export My Data
-              </Button>
-              <Button 
-                variant="danger" 
-                onClick={handleResetInsights}
-                disabled={!userInsights}
-              >
-                🗑️ Reset Insights
+                📥 Експортувати дані
               </Button>
             </div>
             <p className="setting-description">
-              Export your data to save a backup, or reset your insights to start fresh with new preferences.
+              Експортуйте свої дані для збереження резервної копії статистики та налаштувань.
             </p>
           </div>
         </Card>
 
         {/* About */}
-        <Card title="ℹ️ About" className="settings-card">
+        <Card title="ℹ️ Про систему" className="settings-card">
           <div className="about-content">
-            <h3>Tinder AI Feedback Platform</h3>
+            <h3>TIN AI Platform V3</h3>
             <p>
-              An AI-powered platform that learns your preferences through Tinder-style swipes
-              and generates personalized content based on your feedback.
+              AI-платформа що навчається на ваших уподобаннях і генерує персоналізований контент.
+              Система використовує динамічні ваги параметрів для покращення результатів з кожною оцінкою.
             </p>
             <div className="tech-stack">
-              <h4>Tech Stack:</h4>
+              <h4>Технології:</h4>
               <ul>
                 <li>Frontend: React 18</li>
                 <li>Backend: Node.js + Express</li>
                 <li>Database: PostgreSQL (Supabase)</li>
-                <li>AI: OpenAI GPT-4o + Replicate</li>
+                <li>AI: OpenAI GPT-4o + Replicate (Seedream 4, Flux, etc.)</li>
+                <li>Learning: Dynamic Weight System</li>
               </ul>
             </div>
             <div className="version-info">
-              <p><strong>Version:</strong> 1.0.0</p>
-              <p><strong>Repository:</strong> <a href="https://github.com/your-repo" target="_blank" rel="noopener noreferrer">GitHub</a></p>
+              <p><strong>Версія:</strong> 3.0.0</p>
+              <p><strong>Особливості V3:</strong></p>
+              <ul>
+                <li>✅ Проекти та сесії для організації</li>
+                <li>✅ Streaming генерація (перше фото за 1-2 хв)</li>
+                <li>✅ Система ваг з instant оновленням</li>
+                <li>✅ Коментарі з високим пріоритетом</li>
+                <li>✅ Візуалізація історії навчання</li>
+              </ul>
             </div>
           </div>
         </Card>

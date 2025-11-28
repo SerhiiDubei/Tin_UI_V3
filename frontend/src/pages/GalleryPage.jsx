@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { projectsAPI, sessionsAPI, generationAPI } from '../services/api-v3';
 import Button from '../components/Button';
 import Loading from '../components/Loading';
@@ -15,15 +14,10 @@ function GalleryPage() {
   const [error, setError] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   
-  const { user } = useAuth();
   const { projectId, sessionId } = useParams();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadGallery();
-  }, [sessionId, filter]);
-
-  const loadGallery = async () => {
+  const loadGallery = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -48,31 +42,44 @@ function GalleryPage() {
     } finally {
       setLoading(false);
     }
+  }, [projectId, sessionId, filter]);
+
+  useEffect(() => {
+    loadGallery();
+  }, [loadGallery]);
+
+  const getRatingIcon = (rating) => {
+    if (rating === null || rating === undefined) return '⏭️';
+    if (rating >= 3) return '🔥'; // Super like
+    if (rating > 0) return '👍';  // Like
+    if (rating < -1) return '😡'; // Super dislike
+    return '👎';  // Dislike
   };
 
-  const getRatingIcon = (direction) => {
-    switch (direction) {
-      case 'up': return '⭐';
-      case 'right': return '👍';
-      case 'left': return '👎';
-      default: return '⏭️';
-    }
+  const getRatingLabel = (rating) => {
+    if (rating === null || rating === undefined) return 'Не оцінено';
+    if (rating >= 3) return 'Чудово!';
+    if (rating > 0) return 'Подобається';
+    if (rating < -1) return 'Жахливо';
+    return 'Не подобається';
   };
 
-  const getRatingLabel = (direction) => {
-    switch (direction) {
-      case 'up': return 'Superlike';
-      case 'right': return 'Like';
-      case 'left': return 'Dislike';
-      default: return 'Skip';
-    }
-  };
+  // Filter gallery based on rating
+  const filteredGallery = gallery.filter(item => {
+    if (filter === 'all') return true;
+    if (filter === 'superliked') return item.rating >= 3;
+    if (filter === 'liked') return item.rating === 1;
+    if (filter === 'disliked') return item.rating === -1;
+    if (filter === 'superdisliked') return item.rating <= -3;
+    return true;
+  });
 
   const filterCounts = {
     all: gallery.length,
-    superliked: gallery.filter(item => item.rating_direction === 'up').length,
-    liked: gallery.filter(item => item.rating_direction === 'right').length,
-    disliked: gallery.filter(item => item.rating_direction === 'left').length
+    superliked: gallery.filter(item => item.rating >= 3).length,
+    liked: gallery.filter(item => item.rating === 1).length,
+    disliked: gallery.filter(item => item.rating === -1).length,
+    superdisliked: gallery.filter(item => item.rating <= -3).length
   };
 
   if (loading) {
@@ -137,34 +144,40 @@ function GalleryPage() {
             📚 Всі ({filterCounts.all})
           </button>
           <button
-            className={`filter-btn ${filter === 'superliked' ? 'active' : ''}`}
+            className={`filter-btn filter-superlike ${filter === 'superliked' ? 'active' : ''}`}
             onClick={() => setFilter('superliked')}
           >
-            ⭐ Superlike ({filterCounts.superliked})
+            🔥 Чудово! (+3) · {filterCounts.superliked}
           </button>
           <button
-            className={`filter-btn ${filter === 'liked' ? 'active' : ''}`}
+            className={`filter-btn filter-like ${filter === 'liked' ? 'active' : ''}`}
             onClick={() => setFilter('liked')}
           >
-            👍 Like ({filterCounts.liked})
+            👍 Подобається (+1) · {filterCounts.liked}
           </button>
           <button
-            className={`filter-btn ${filter === 'disliked' ? 'active' : ''}`}
+            className={`filter-btn filter-dislike ${filter === 'disliked' ? 'active' : ''}`}
             onClick={() => setFilter('disliked')}
           >
-            👎 Dislike ({filterCounts.disliked})
+            👎 Не подобається (-1) · {filterCounts.disliked}
+          </button>
+          <button
+            className={`filter-btn filter-superdislike ${filter === 'superdisliked' ? 'active' : ''}`}
+            onClick={() => setFilter('superdisliked')}
+          >
+            😡 Жахливо (-3) · {filterCounts.superdisliked}
           </button>
         </div>
 
         {/* Gallery Grid */}
-        {gallery.length === 0 ? (
+        {filteredGallery.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🎨</div>
             <h2>Немає зображень</h2>
             <p>
               {filter === 'all'
                 ? 'Поки що немає згенерованого контенту в цій сесії'
-                : `Немає зображень з фільтром "${getRatingLabel(filter === 'superliked' ? 'up' : filter === 'liked' ? 'right' : 'left')}"`}
+                : `Немає зображень з фільтром "${filter === 'superliked' ? 'Чудово!' : filter === 'liked' ? 'Подобається' : 'Не подобається'}"`}
             </p>
             <Button
               onClick={() => navigate(`/projects/${projectId}/sessions/${sessionId}/generate`)}
@@ -175,7 +188,7 @@ function GalleryPage() {
           </div>
         ) : (
           <div className="gallery-grid">
-            {gallery.map((item) => (
+            {filteredGallery.map((item) => (
               <div
                 key={item.id}
                 className="gallery-item"
@@ -187,9 +200,9 @@ function GalleryPage() {
                     alt={item.original_prompt}
                     className="gallery-image"
                   />
-                  {item.rating_direction && (
-                    <div className={`rating-badge rating-${item.rating_direction}`}>
-                      {getRatingIcon(item.rating_direction)}
+                  {item.rating !== null && item.rating !== undefined && (
+                    <div className={`rating-badge rating-${item.rating >= 0 ? 'positive' : 'negative'}`}>
+                      {getRatingIcon(item.rating)}
                     </div>
                   )}
                 </div>
@@ -237,15 +250,18 @@ function GalleryPage() {
                   <p className="scrollable">{selectedImage.enhanced_prompt}</p>
                 </div>
               )}
-              {selectedImage.rating_direction && (
+              {selectedImage.rating !== null && selectedImage.rating !== undefined && (
                 <div className="modal-section">
                   <h3>⭐ Оцінка</h3>
                   <div className="rating-info">
-                    <span className={`rating-badge-large rating-${selectedImage.rating_direction}`}>
-                      {getRatingIcon(selectedImage.rating_direction)} {getRatingLabel(selectedImage.rating_direction)}
+                    <span className={`rating-badge-large rating-${selectedImage.rating >= 0 ? 'positive' : 'negative'}`}>
+                      {getRatingIcon(selectedImage.rating)} {getRatingLabel(selectedImage.rating)}
                     </span>
-                    {selectedImage.rating_comment && (
-                      <p className="rating-comment-full">💬 {selectedImage.rating_comment}</p>
+                    <div className="rating-value-display">
+                      Значення: <strong>{selectedImage.rating > 0 ? '+' : ''}{selectedImage.rating}</strong>
+                    </div>
+                    {selectedImage.comment && (
+                      <p className="rating-comment-full">💬 {selectedImage.comment}</p>
                     )}
                   </div>
                 </div>

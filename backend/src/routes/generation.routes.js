@@ -1,6 +1,6 @@
 import express from 'express';
 import { supabase } from '../db/supabase.js';
-import { selectParametersWeighted } from '../services/weights.service.js';
+import { selectParametersWeighted, updateWeightsInstantly } from '../services/weights.service.js';
 import { buildPromptFromParameters } from '../services/agent.service.js';
 import { generateImage as generateImageReplicate } from '../services/replicate.service.js';
 import { generateImage as generateImageGenSpark } from '../services/genspark.service.js';
@@ -152,7 +152,8 @@ router.post('/generate', async (req, res) => {
           userPrompt,
           selectedParams,
           agentType,
-          category
+          category,
+          sessionId  // 🔥 Pass sessionId for comments loading
         );
         
         if (!promptResult.success) {
@@ -164,23 +165,12 @@ router.post('/generate', async (req, res) => {
         // Step 3: Generate image
         console.log('🎨 Generating image with', model);
         
-        let generationResult;
-        
-        if (model === 'nano-banana-pro') {
-          // Use GenSpark Nano Banana Pro
-          generationResult = await generateImageGenSpark(enhancedPrompt, {
-            model: 'nano-banana-pro',
-            aspectRatio: '1:1',
-            taskSummary: `V3 Generation for ${category}`
-          });
-        } else {
-          // Use Replicate (existing models)
-          generationResult = await generateImageReplicate(
-            enhancedPrompt,
-            { modelKey: model },
-            userId
-          );
-        }
+        // All models now use Replicate (including nano-banana-pro)
+        const generationResult = await generateImageReplicate(
+          enhancedPrompt,
+          { modelKey: model },
+          userId
+        );
         
         if (!generationResult.success) {
           throw new Error('Generation failed: ' + generationResult.error);
@@ -308,11 +298,21 @@ router.post('/rate', async (req, res) => {
     if (error) throw error;
     
     console.log('✅ Rating saved');
-    console.log('   Trigger will track this for next session weights');
+    
+    // 🔥 INSTANT WEIGHT UPDATE (method.txt approach)
+    const weightUpdateResult = await updateWeightsInstantly(contentId, rating);
+    
+    if (weightUpdateResult.success) {
+      console.log(`✅ Weights updated instantly: ${weightUpdateResult.updatesCount} parameters`);
+    } else {
+      console.warn('⚠️  Weight update failed:', weightUpdateResult.error);
+    }
     
     res.json({
       success: true,
-      data: content
+      data: content,
+      weightsUpdated: weightUpdateResult.success,
+      updatesCount: weightUpdateResult.updatesCount
     });
     
   } catch (error) {

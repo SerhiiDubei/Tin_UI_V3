@@ -121,8 +121,10 @@ export const insightsAPI = {
   }
 };
 
-export default {
+const apiService = {
   contentAPI,
   ratingsAPI,
   insightsAPI
 };
+
+export default apiService;

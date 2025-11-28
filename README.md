@@ -1,362 +1,298 @@
-# 🔥 Tinder AI Feedback Platform
+# 🔥 Tin UI V3 - AI Content Generation Platform
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
-![React](https://img.shields.io/badge/react-18.2.0-blue)
+**Tinder-style AI feedback platform for content generation and optimization**
 
-**AI платформа, що генерує персоналізований контент на основі ваших вподобань через Tinder-style swipe інтерфейс.**
+Modern full-stack application that generates AI content (images, videos, audio) and learns from user preferences through swipe-based feedback.
 
 ---
 
-## ✨ Ключові Можливості
+## 🎯 Features
 
-### 🎨 AI Content Generation
-- **Seedream 4.0 Integration** - Реалістичні smartphone фото з 11-параметровою системою
-- **Smart Prompting** - GPT-4o покращує промпти з врахуванням insights
-- **Authentic Imperfections** - Motion blur, lens flare, tilted horizon для реалізму
-- **Era Consistency** - Підтримка 2010-2024 (iPhone 4S → iPhone 14 Pro)
-- **Batch Generation** - До 10 унікальних варіацій одночасно
+### 🎨 Content Generation
+- **Multi-modal AI**: Generate images, videos, and audio
+- **Smart Prompts**: AI-enhanced prompts using GPT-4o
+- **Multiple Models**: Seedream 4, Replicate models, and more
+- **Real-time Generation**: Step-by-step content creation
 
-### 👆 Tinder-Style Interface
-- **← Left** - Dislike (з опціональним коментарем)
-- **→ Right** - Like
-- **↑ Up** - Superlike
-- **↓ Down** - Skip (можна оцінити пізніше)
+### 👆 Swipe Feedback
+- **Tinder-style Interface**: Swipe left (dislike), right (like), up (superlike), down (skip)
+- **Comment System**: Add detailed feedback to ratings
+- **Learning Algorithm**: AI learns from your preferences
+- **Parameter Optimization**: Weighted parameters adjust based on ratings
 
-### 🧠 Intelligent Learning
-- **User Insights** - OpenAI аналізує коментарі та витягує preferences
-- **Automated Updates** - Insights оновлюються кожні 10 ratings
-- **Personalization** - Кожна генерація враховує ваші вподобання
-- **Category Detection** - Автоматичне визначення dating/nature/architecture
+### 📊 Project Management
+- **Projects & Sessions**: Organize your work into projects and sessions
+- **Gallery View**: Browse all generated content with filters
+- **Statistics**: Track likes, dislikes, and engagement
+- **User Insights**: AI-analyzed preferences and suggestions
 
-### 📊 Analytics Dashboard
-- **Real-time Stats** - Likes, dislikes, like rate
-- **Top Content** - Найкращий згенерований контент
-- **Insights Visualization** - Ваші переваги в structured форматі
+### 🔐 Authentication
+- **User Accounts**: Registration and login system
+- **Role-based Access**: User and admin roles
+- **Test Accounts**: Pre-configured for quick testing
+
+---
+
+## 🛠 Tech Stack
+
+### Frontend
+- **React 18** - Modern UI library
+- **React Router v6** - Client-side routing
+- **Context API** - State management
+- **CSS3** - Custom responsive styling
+
+### Backend
+- **Node.js + Express** - REST API server
+- **Supabase (PostgreSQL)** - Database and storage
+- **OpenAI GPT-4o** - Prompt enhancement
+- **Replicate API** - AI model integration
+- **Seedream API** - Image/video generation
+
+### Infrastructure
+- **Supabase** - Database, Storage, Auth
+- **Vercel** - Frontend deployment (optional)
+- **PM2** - Process management
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+- Node.js 18+ and npm
+- Supabase account
+- OpenAI API key
+- Replicate API key (optional)
+- Seedream API key (optional)
 
-- Node.js 18+
-- Supabase Account
-- Replicate API Key
-- OpenAI API Key
-
-### Installation
+### 1. Clone and Install
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/SerhiiDubei/Tin_UI_V2.git
-cd Tin_UI_V2
+git clone <your-repo-url>
+cd Tin_UI_V3
 
-# 2. Interactive setup
+# Install backend dependencies
+cd backend
 npm install
-node scripts/setup.js
 
-# 3. Setup database
-# - Go to Supabase Dashboard → SQL Editor
-# - Run database/migrations/*.sql files
-
-# 4. Create Storage Bucket
-# - Supabase → Storage → New Bucket
-# - Name: generated-content
-# - Public: YES
-
-# 5. Install dependencies & run
-npm run install:all
-npm run dev
+# Install frontend dependencies
+cd ../frontend
+npm install
 ```
 
-**URLs:**
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:5000
+### 2. Database Setup
 
----
+1. Go to [Supabase](https://supabase.com) and create a new project
+2. Open SQL Editor in Supabase Dashboard
+3. Copy and run the entire `database/MIGRATION.sql` file
+4. Wait for completion - this creates all tables and test users
 
-## 🛠️ Tech Stack
+### 3. Backend Configuration
 
-### Frontend
-- React 18.2.0
-- React Router DOM 6
-- Axios
-- CSS3
+Create `backend/.env`:
 
-### Backend
-- Node.js 18+
-- Express 4.21
-- Supabase PostgreSQL
-- OpenAI GPT-4o / GPT-4o-mini
-- Replicate API (ByteDance Seedream-4)
+```env
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
 
-### AI Integration
-- **Seedream 4.0** - 11-parameter smartphone photo system
-- **OpenAI GPT-4o** - Prompt enhancement (800 tokens)
-- **OpenAI GPT-4o-mini** - Category detection, comment analysis
-- **Replicate** - Image generation
+# OpenAI (for prompt enhancement)
+OPENAI_API_KEY=sk-your-key
+
+# Replicate (optional - for additional models)
+REPLICATE_API_TOKEN=r8_your-token
+
+# Seedream (optional - for Seedream 4 model)
+SEEDREAM_API_KEY=your-seedream-key
+
+# Server
+PORT=5000
+NODE_ENV=development
+```
+
+### 4. Frontend Configuration
+
+Create `frontend/.env`:
+
+```env
+REACT_APP_API_URL=http://localhost:5000/api
+```
+
+### 5. Start Development Servers
+
+**Terminal 1 - Backend:**
+```bash
+cd backend
+npm start
+```
+
+**Terminal 2 - Frontend:**
+```bash
+cd frontend
+npm start
+```
+
+Frontend opens at `http://localhost:3000`
+
+### 6. Login
+
+Use test accounts:
+- **Admin**: `admin` / `admin123`
+- **User**: `testuser` / `test123`
+
+Or register a new account!
 
 ---
 
 ## 📁 Project Structure
 
 ```
-Tin_UI_V2/
-├── frontend/                 # React App
-│   └── src/
-│       ├── components/       # UI Components
-│       ├── pages/            # Pages
-│       └── services/         # API Client
+Tin_UI_V3/
+├── backend/                # Node.js API server
+│   ├── src/
+│   │   ├── routes/        # API routes
+│   │   ├── services/      # Business logic
+│   │   ├── db/            # Database connection
+│   │   ├── middleware/    # Express middleware
+│   │   └── config/        # Configuration
+│   └── package.json
 │
-├── backend/                  # Express API
-│   └── src/
-│       ├── services/
-│       │   ├── openai.service.js      # 🆕 Seedream 4.0
-│       │   ├── replicate.service.js
-│       │   └── insights.service.js
-│       └── routes/
+├── frontend/              # React application
+│   ├── src/
+│   │   ├── pages/         # Page components
+│   │   ├── components/    # Reusable components
+│   │   ├── contexts/      # React contexts
+│   │   ├── services/      # API client
+│   │   └── hooks/         # Custom hooks
+│   └── package.json
 │
-├── database/                 # Database Schema
-│   └── migrations/
+├── database/              # Database migrations
+│   └── MIGRATION.sql      # Complete DB setup
 │
-└── docs/                     # Documentation
-    ├── ARCHITECTURE.md       # 📊 ER + IR Diagrams
-    └── SEEDREAM.md          # 📱 Seedream 4.0 Guide
+├── README.md              # This file
+└── SETUP.md              # Detailed setup guide
 ```
 
 ---
 
-## 🗄️ Database Schema
+## 🎮 Usage
 
-### 5 Core Tables:
+### Creating a Project
+1. Login to the application
+2. Click "➕ Створити Проєкт"
+3. Enter project name, category, and description
+4. Click "Створити проєкт"
 
-```
-users ←─ content ←─ ratings
-         ↓
-    user_insights
+### Starting a Session
+1. Open your project
+2. Click "➕ Нова Сесія"
+3. Enter session name
+4. AI generates initial parameters automatically
 
-prompt_templates ─→ content
-```
+### Generating Content
+1. Open a session
+2. Enter your prompt (e.g., "Beautiful sunset over ocean")
+3. Click "🚀 Згенерувати та почати свайпати"
+4. Wait for generation (10 images by default)
+5. Start swiping!
 
-1. **users** - User accounts (auth)
-2. **prompt_templates** - AI templates with insights
-3. **content** - Generated content (images/video)
-4. **ratings** - User feedback (swipes + comments)
-5. **user_insights** - Learned preferences
+### Swiping Content
+- **Swipe Left** / **←**: Dislike
+- **Swipe Right** / **→**: Like
+- **Swipe Up** / **↑**: Superlike (love it!)
+- **Swipe Down** / **↓**: Skip
+- Add optional comments for detailed feedback
 
-**Details:** See [ARCHITECTURE.md](./docs/ARCHITECTURE.md)
-
----
-
-## 🎯 How It Works
-
-### 1. Content Generation Flow
-
-```
-User Prompt
-    ↓
-Detect Category (GPT-4o-mini)
-    ↓
-Fetch User Insights (from ratings + comments)
-    ↓
-Enhance Prompt (GPT-4o + Seedream 4.0)
-    ↓
-Generate Image (Replicate Seedream-4)
-    ↓
-Save to Database & Storage
-    ↓
-Return URL
-```
-
-### 2. Learning Flow
-
-```
-User Swipes (left/right/up/down)
-    ↓
-Save Rating (+ optional comment)
-    ↓
-Every 10 Ratings:
-    ↓
-Analyze Comments (GPT-4o-mini)
-    ↓
-Extract Keywords (likes/dislikes)
-    ↓
-Update user_insights
-    ↓
-Next Generation Uses Insights
-```
+### Viewing Gallery
+1. Click "🖼️ Галерея" in session view
+2. Filter by: All, Superliked, Liked, Disliked
+3. Click any image to view details
 
 ---
 
-## 📱 Seedream 4.0 System
+## 🔑 API Keys Setup
 
-### 11-Parameter Modular System
+### OpenAI (Required for prompt enhancement)
+1. Go to https://platform.openai.com/api-keys
+2. Create new API key
+3. Add to `backend/.env` as `OPENAI_API_KEY`
 
-**TIER 1 - MANDATORY:**
-1. SMARTPHONE_PHOTO_STYLE (filename, device, era)
-2. SUBJECT (person description)
+### Replicate (Optional)
+1. Go to https://replicate.com/account/api-tokens
+2. Create token
+3. Add to `backend/.env` as `REPLICATE_API_TOKEN`
 
-**TIER 2 - SITUATIONAL (3-4):**
-3. COMPOSITION (framing, angles)
-4. BACKGROUND (setting)
-5. LIGHTING (source, direction)
-
-**TIER 3 - ENHANCEMENT (1-2):**
-6. COLOR_PALETTE
-7. MOOD_ATMOSPHERE
-8. MOTION_DYNAMICS
-9. DEPTH_FOCUS
-10. TEXTURE_DETAIL
-11. TIME_WEATHER
-
-### Example Output:
-
-```
-IMG_5847.HEIC, iPhone 14 Pro, 2023 casual aesthetic.
-
-A 26-year-old woman with shoulder-length blonde hair and subtle 
-freckles, genuine smile while sitting at a café table. Close-up 
-shot from slightly above eye level, subject positioned using rule 
-of thirds. Soft natural window light from the left creating gentle 
-shadows on the right side of face. Warm, inviting atmosphere with 
-slightly boosted saturation. Slight motion blur on hands, small 
-lens flare visible in upper right corner.
-```
-
-**Details:** See [SEEDREAM.md](./docs/SEEDREAM.md)
-
----
-
-## 🔧 API Endpoints
-
-### Content
-```
-POST   /api/content/generate         # Generate content
-GET    /api/content/:id              # Get by ID
-GET    /api/content/random/next      # Random for swipe
-```
-
-### Ratings
-```
-POST   /api/ratings                  # Create rating
-GET    /api/ratings                  # List ratings
-GET    /api/ratings/stats            # User statistics
-```
-
-### Insights
-```
-GET    /api/insights/user/:userId           # Get insights
-POST   /api/insights/user/:userId/update    # Trigger update
-GET    /api/insights/dashboard               # Dashboard data
-```
-
----
-
-## 📊 Performance Metrics
-
-| Metric | Value |
-|--------|-------|
-| **Prompt Length** | 300-500 chars |
-| **Parameters Used** | 5-7 / 11 |
-| **Generation Time** | 35-40 sec |
-| **OpenAI Tokens** | 600-800 |
-| **Cost per Image** | ~$0.034 |
-| **Realism Level** | HIGH ✨ |
-
----
-
-## 🚀 Deployment
-
-### Frontend (Vercel/GitHub Pages)
-```bash
-npm run build:frontend
-# Deploy build/ directory
-```
-
-### Backend (Vercel/Railway)
-```bash
-# Set environment variables:
-SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
-OPENAI_API_KEY=...
-REPLICATE_API_TOKEN=...
-
-# Deploy backend/ directory
-```
-
----
-
-## 📚 Documentation
-
-- **README.md** (this file) - Overview & Quick Start
-- **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - ER Diagrams, Database Schema, Architecture
-- **[SEEDREAM.md](./docs/SEEDREAM.md)** - Seedream 4.0 Integration Guide
+### Seedream (Optional)
+1. Contact Seedream for API access
+2. Add key to `backend/.env` as `SEEDREAM_API_KEY`
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Images expire after 24-48h
-✅ **Fixed!** Now using Supabase Storage for permanent URLs.
+### Backend won't start
+- Check `.env` file exists in `backend/`
+- Verify Supabase credentials are correct
+- Run `npm install` in backend folder
 
-### No insights updating
-- Check that you have 10+ ratings with comments
-- Trigger manually: `POST /api/insights/user/:userId/update`
+### Database errors
+- Ensure `MIGRATION.sql` was executed successfully
+- Check Supabase dashboard for connection
+- Verify tables exist in Table Editor
 
-### OpenAI errors
-- Check API key is valid
-- Verify billing is active
-- Check rate limits
+### Can't login
+- Check backend is running on port 5000
+- Verify test users exist in database
+- Try registering a new account
 
----
-
-## ✅ Project Status
-
-**Version:** 1.2.0  
-**Last Updated:** 2025-11-21  
-**Status:** ✅ **PRODUCTION READY**
-
-### Recent Updates:
-
-**v1.2.0 (2025-11-21):**
-- ✅ Seedream 4.0 Integration (11-parameter system)
-- ✅ Enhanced prompt generation (300-500 chars)
-- ✅ Era consistency (2010-2024)
-- ✅ Authentic imperfections
-- ✅ Parameter detection & validation
-- ✅ Comprehensive documentation
-
-**v1.1.0 (2025-10-27):**
-- ✅ Permanent Storage (Supabase)
-- ✅ URL Migration Tool
-- ✅ Auto-download on generation
-
-**v1.0.0:**
-- ✅ Full frontend + backend
-- ✅ User authentication
-- ✅ AI Learning System
-- ✅ Batch generation
-- ✅ Admin Panel
+### Generation fails
+- Verify API keys in `.env`
+- Check backend logs for errors
+- Ensure you have API credits
 
 ---
 
-## 🤝 Contributing
+## 🚢 Deployment
 
-Contributions welcome! 
+### Frontend (Vercel)
+```bash
+cd frontend
+npm run build
+# Deploy 'build' folder to Vercel
+```
 
+### Backend (PM2)
+```bash
+cd backend
+pm2 start src/server.js --name tin-ui-backend
+pm2 save
+```
+
+---
+
+## 📝 License
+
+MIT License - Feel free to use for personal and commercial projects
+
+---
+
+## 👥 Contributing
+
+Contributions welcome! Please:
 1. Fork the repository
 2. Create feature branch
 3. Commit changes
-4. Open Pull Request
+4. Push to branch
+5. Open Pull Request
 
 ---
 
-## 📧 Contact
+## 📞 Support
 
-**Repository:** https://github.com/SerhiiDubei/Tin_UI_V2  
-**Issues:** https://github.com/SerhiiDubei/Tin_UI_V2/issues
+For issues and questions:
+- Check `SETUP.md` for detailed configuration
+- Review backend logs for errors
+- Check Supabase dashboard for database issues
 
 ---
 
-Made with ❤️ by SerhiiDubei
+**Built with ❤️ using React, Node.js, and AI**

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import SwipeCard from '../components/SwipeCard';
 import useSwipe from '../hooks/useSwipe';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,12 +16,7 @@ function SwipePage() {
   
   const skippedCount = getSkippedCount();
   
-  useEffect(() => {
-    loadNext();
-    loadStats();
-  }, [loadNext]);
-  
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const { ratingsAPI } = await import('../services/api');
       const response = await ratingsAPI.getStats(userId);
@@ -31,7 +26,12 @@ function SwipePage() {
     } catch (err) {
       console.error('Failed to load stats:', err);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    loadNext();
+    loadStats();
+  }, [loadNext, loadStats]);
   
   const onSwipe = async (direction) => {
     // Show comment modal for all swipes except skip (optional for all)

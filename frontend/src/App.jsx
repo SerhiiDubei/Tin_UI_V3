@@ -11,11 +11,12 @@ import SwipePage from './pages/SwipePage';
 import DashboardPage from './pages/DashboardPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
+import WeightHistoryPage from './pages/WeightHistoryPage';
 import './App.css';
 
 // Protected Route Component
 function ProtectedRoute({ children, adminOnly = false }) {
-  const { user, isAuthenticated, isAdmin } = useAuth();
+  const { isAuthenticated, isAdmin } = useAuth();
 
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
@@ -62,22 +63,6 @@ function Navigation() {
           >
             <span className="nav-icon">📁</span>
             <span>Projects</span>
-          </Link>
-          <Link
-            to="/generate"
-            className={`nav-link ${isActive('/generate') ? 'nav-link-active' : ''}`}
-            onClick={closeMenu}
-          >
-            <span className="nav-icon">🎨</span>
-            <span>Generate (V2)</span>
-          </Link>
-          <Link
-            to="/swipe"
-            className={`nav-link ${isActive('/swipe') ? 'nav-link-active' : ''}`}
-            onClick={closeMenu}
-          >
-            <span className="nav-icon">👆</span>
-            <span>Swipe (V2)</span>
           </Link>
           <Link
             to="/dashboard"
@@ -175,7 +160,16 @@ function AppContent() {
             }
           />
           
-          {/* V2 Routes (legacy) */}
+          <Route
+            path="/projects/:projectId/sessions/:sessionId/weights"
+            element={
+              <ProtectedRoute>
+                <WeightHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* V2 Routes (legacy) */}}
           <Route
             path="/generate"
             element={

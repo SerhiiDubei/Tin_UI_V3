@@ -26,9 +26,40 @@ router.get('/', async (req, res) => {
     
     if (error) throw error;
     
+    // Add statistics for each project
+    const projectsWithStats = await Promise.all(
+      (projects || []).map(async (project) => {
+        // Count sessions
+        const { count: sessionsCount } = await supabase
+          .from('sessions')
+          .select('*', { count: 'exact', head: true })
+          .eq('project_id', project.id);
+        
+        // Count generations
+        const { count: generationsCount } = await supabase
+          .from('content_v3')
+          .select('*', { count: 'exact', head: true })
+          .eq('project_id', project.id);
+        
+        // Count ratings
+        const { count: ratingsCount } = await supabase
+          .from('content_v3')
+          .select('*', { count: 'exact', head: true })
+          .eq('project_id', project.id)
+          .not('rating', 'is', null);
+        
+        return {
+          ...project,
+          sessions_count: sessionsCount || 0,
+          generations_count: generationsCount || 0,
+          ratings_count: ratingsCount || 0
+        };
+      })
+    );
+    
     res.json({
       success: true,
-      data: projects
+      data: projectsWithStats
     });
     
   } catch (error) {
@@ -63,9 +94,31 @@ router.get('/:id', async (req, res) => {
       });
     }
     
+    // Add statistics
+    const { count: sessionsCount } = await supabase
+      .from('sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', id);
+    
+    const { count: generationsCount } = await supabase
+      .from('content_v3')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', id);
+    
+    const { count: ratingsCount } = await supabase
+      .from('content_v3')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', id)
+      .not('rating', 'is', null);
+    
     res.json({
       success: true,
-      data: project
+      data: {
+        ...project,
+        sessions_count: sessionsCount || 0,
+        generations_count: generationsCount || 0,
+        ratings_count: ratingsCount || 0
+      }
     });
     
   } catch (error) {

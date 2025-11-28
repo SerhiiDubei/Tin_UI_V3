@@ -96,7 +96,7 @@ export const sessionsAPI = {
   /**
    * Get sessions for project
    */
-  getAll: async (projectId) => {
+  getByProject: async (projectId) => {
     return request(`/sessions?projectId=${projectId}`);
   },
 
@@ -148,6 +148,13 @@ export const sessionsAPI = {
    */
   getParameters: async (sessionId) => {
     return request(`/sessions/${sessionId}/parameters`);
+  },
+
+  /**
+   * Get weight history for visualization
+   */
+  getWeightHistory: async (sessionId) => {
+    return request(`/sessions/${sessionId}/weight-history`);
   }
 };
 
@@ -169,18 +176,18 @@ export const generationAPI = {
   /**
    * Rate generated content
    */
-  rate: async (contentId, rating, comment = null) => {
+  rate: async (data) => {
     return request('/generation/rate', {
       method: 'POST',
-      body: JSON.stringify({ contentId, rating, comment })
+      body: JSON.stringify(data)
     });
   },
 
   /**
    * Get gallery for session
    */
-  getGallery: async (sessionId) => {
-    return request(`/generation/gallery?sessionId=${sessionId}`);
+  getGallery: async (sessionId, filter = 'all') => {
+    return request(`/generation/gallery?sessionId=${sessionId}&filter=${filter}`);
   }
 };
 
@@ -194,9 +201,11 @@ export const healthAPI = {
   }
 };
 
-export default {
+const apiV3Service = {
   projects: projectsAPI,
   sessions: sessionsAPI,
   generation: generationAPI,
   health: healthAPI
 };
+
+export default apiV3Service;

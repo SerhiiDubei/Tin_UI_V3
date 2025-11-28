@@ -1,11 +1,24 @@
-import supabase from '../db/supabase.js';
+import { createClient } from '@supabase/supabase-js';
+import config from '../config/index.js';
 import fetch from 'node-fetch';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Storage Service - handles permanent file storage in Supabase Storage
- * Fixes the issue where Replicate URLs expire after 24-48 hours
+ * Uses Service Role Key for full storage access
  */
+
+// Create Supabase client with Service Role Key for Storage operations
+const supabaseStorage = createClient(
+  config.supabase.url,
+  config.supabase.serviceRoleKey,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+);
 
 const BUCKET_NAME = 'generated-content';
 
@@ -16,7 +29,7 @@ const BUCKET_NAME = 'generated-content';
 export async function initializeStorage() {
   try {
     // Check if bucket exists
-    const { data: buckets } = await supabase.storage.listBuckets();
+    const { data: buckets } = await supabaseStorage.storage.listBuckets();
     const bucketExists = buckets?.some(b => b.name === BUCKET_NAME);
     
     if (!bucketExists) {
@@ -71,7 +84,7 @@ export async function uploadFromUrl(url, contentType, userId = 'anonymous') {
     console.log(`📤 Uploading to Supabase Storage: ${filename}`);
     
     // Upload to Supabase Storage
-    const { data, error } = await supabase.storage
+    const { data, error } = await supabaseStorage.storage
       .from(BUCKET_NAME)
       .upload(filename, buffer, {
         contentType: mimeType,
@@ -83,7 +96,7 @@ export async function uploadFromUrl(url, contentType, userId = 'anonymous') {
     }
     
     // Get public URL
-    const { data: urlData } = supabase.storage
+    const { data: urlData } = supabaseStorage.storage
       .from(BUCKET_NAME)
       .getPublicUrl(filename);
     
@@ -134,7 +147,7 @@ function getFileExtension(mimeType, contentType) {
  */
 export async function deleteFile(filename) {
   try {
-    const { error } = await supabase.storage
+    const { error } = await supabaseStorage.storage
       .from(BUCKET_NAME)
       .remove([filename]);
     
@@ -155,8 +168,8 @@ export async function migrateExistingUrls() {
   try {
     console.log('🔄 Starting migration of existing URLs...');
     
-    // Get all content with replicate.delivery URLs
-    const { data: contents, error } = await supabase
+    // Get all content with replicate.delivery URLs (using regular supabase client for DB)
+    const { data: contents, error } = await supabaseStorage
       .from('content')
       .select('id, url, type, user_id')
       .like('url', '%replicate.delivery%');
@@ -180,7 +193,7 @@ export async function migrateExistingUrls() {
         
         if (result.success) {
           // Update database with new permanent URL
-          const { error: updateError } = await supabase
+          const { error: updateError } = await supabaseStorage
             .from('content')
             .update({ url: result.url })
             .eq('id', content.id);

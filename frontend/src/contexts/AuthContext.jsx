@@ -32,6 +32,30 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(userData));
   };
 
+  const register = async (username, email, password, fullName) => {
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+    const response = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        username, 
+        email, 
+        password,
+        full_name: fullName 
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Registration failed');
+    }
+
+    // Auto-login after registration
+    login(data.user);
+    return data;
+  };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
@@ -48,6 +72,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     login,
+    register,
     logout,
     isAdmin,
     isAuthenticated,

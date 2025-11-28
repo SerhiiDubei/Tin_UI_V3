@@ -1,6 +1,6 @@
 import express from 'express';
 import { supabase } from '../db/supabase.js';
-import { createParametersForCategory, initializeSessionWeights } from '../services/weights.service.js';
+import { createParametersForCategory, initializeSessionWeights, getWeightHistory } from '../services/weights.service.js';
 
 const router = express.Router();
 
@@ -28,9 +28,40 @@ router.get('/', async (req, res) => {
     
     if (error) throw error;
     
+    // Add statistics for each session
+    const sessionsWithStats = await Promise.all(
+      (sessions || []).map(async (session) => {
+        // Count content
+        const { count: contentCount } = await supabase
+          .from('content_v3')
+          .select('*', { count: 'exact', head: true })
+          .eq('session_id', session.id);
+        
+        // Count ratings
+        const { count: ratingsCount } = await supabase
+          .from('content_v3')
+          .select('*', { count: 'exact', head: true })
+          .eq('session_id', session.id)
+          .not('rating', 'is', null);
+        
+        // Count parameters
+        const { count: parametersCount } = await supabase
+          .from('weight_parameters')
+          .select('*', { count: 'exact', head: true })
+          .eq('session_id', session.id);
+        
+        return {
+          ...session,
+          generations_count: contentCount || 0,
+          ratings_count: ratingsCount || 0,
+          parameters_count: parametersCount || 0
+        };
+      })
+    );
+    
     res.json({
       success: true,
-      data: sessions
+      data: sessionsWithStats
     });
     
   } catch (error) {
@@ -355,6 +386,34 @@ router.get('/:id/parameters', async (req, res) => {
     
   } catch (error) {
     console.error('Get session parameters error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/sessions/:id/weight-history
+ * Get weight history for visualization
+ * Shows how weights changed over time based on ratings
+ */
+router.get('/:id/weight-history', async (req, res) => {
+  try {
+    const { id: sessionId } = req.params;
+    
+    console.log('📊 Getting weight history for session:', sessionId);
+    
+    const result = await getWeightHistory(sessionId);
+    
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json(result);
+    }
+    
+  } catch (error) {
+    console.error('Error getting weight history:', error);
     res.status(500).json({
       success: false,
       error: error.message

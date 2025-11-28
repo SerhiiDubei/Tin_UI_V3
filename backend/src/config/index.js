@@ -9,6 +9,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env'), override: true });
 const requiredEnvVars = [
   'SUPABASE_URL',
   'SUPABASE_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
   'REPLICATE_API_TOKEN',
   'OPENAI_API_KEY'
 ];
@@ -30,7 +31,8 @@ export const config = {
   
   supabase: {
     url: process.env.SUPABASE_URL,
-    key: process.env.SUPABASE_KEY
+    key: process.env.SUPABASE_KEY,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY
   },
   
   replicate: {

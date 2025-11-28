@@ -440,9 +440,248 @@ export async function getSessionWeightsVisualization(sessionId) {
   }
 }
 
+/**
+ * Update weights instantly after rating (method.txt approach)
+ * Apply rating to ALL parameters that were used in the prompt
+ * 
+ * @param {string} contentId - Content ID that was rated
+ * @param {number} rating - Rating score: -3, -1, +1, +3
+ */
+export async function updateWeightsInstantly(contentId, rating) {
+  console.log(`\n⚖️  INSTANT WEIGHT UPDATE`);
+  console.log(`Content ID: ${contentId}`);
+  console.log(`Rating: ${rating}`);
+  
+  try {
+    // Step 1: Get content with weights_used
+    const { data: content, error: contentError } = await supabase
+      .from('content_v3')
+      .select('session_id, weights_used')
+      .eq('id', contentId)
+      .single();
+    
+    if (contentError) throw contentError;
+    
+    if (!content || !content.weights_used || !content.weights_used.parameters) {
+      console.log('⚠️  No weights snapshot found for this content');
+      return { success: false, error: 'No weights data' };
+    }
+    
+    const sessionId = content.session_id;
+    const parameters = content.weights_used.parameters;
+    
+    console.log(`📊 Updating ${parameters.length} parameters`);
+    
+    // Step 2: Calculate weight delta based on rating
+    // -3 → -15, -1 → -5, +1 → +5, +3 → +15
+    const weightDelta = rating * 5;
+    
+    console.log(`📈 Weight delta: ${weightDelta > 0 ? '+' : ''}${weightDelta}`);
+    
+    // Step 3: Update each parameter that was used in this generation
+    const updates = [];
+    
+    for (const param of parameters) {
+      const { parameter, value } = param;
+      
+      // Get current weight
+      const { data: currentWeight, error: getError } = await supabase
+        .from('weight_parameters')
+        .select('weight')
+        .eq('session_id', sessionId)
+        .eq('parameter_name', parameter)
+        .eq('sub_parameter', value)
+        .single();
+      
+      if (getError) {
+        console.error(`Error getting weight for ${parameter}.${value}:`, getError);
+        continue;
+      }
+      
+      // Calculate new weight (clamp between 0 and 200)
+      const newWeight = Math.max(0, Math.min(200, currentWeight.weight + weightDelta));
+      
+      // Update in database
+      const { error: updateError } = await supabase
+        .from('weight_parameters')
+        .update({ weight: newWeight })
+        .eq('session_id', sessionId)
+        .eq('parameter_name', parameter)
+        .eq('sub_parameter', value);
+      
+      if (updateError) {
+        console.error(`Error updating weight for ${parameter}.${value}:`, updateError);
+      } else {
+        updates.push({
+          parameter: `${parameter}.${value}`,
+          oldWeight: currentWeight.weight,
+          newWeight: newWeight,
+          delta: weightDelta
+        });
+      }
+    }
+    
+    console.log(`✅ Updated ${updates.length} weights`);
+    
+    // Show top changes
+    if (updates.length > 0) {
+      console.log('📊 Weight changes:');
+      updates.slice(0, 5).forEach(u => {
+        console.log(`   ${u.parameter}: ${u.oldWeight} → ${u.newWeight} (${u.delta > 0 ? '+' : ''}${u.delta})`);
+      });
+    }
+    
+    return {
+      success: true,
+      updatesCount: updates.length,
+      weightDelta: weightDelta,
+      updates: updates
+    };
+    
+  } catch (error) {
+    console.error('Error updating weights instantly:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Get weight history for a session
+ * Shows how weights changed over time based on ratings
+ * 
+ * @param {string} sessionId 
+ * @returns {Object} History of weight changes
+ */
+export async function getWeightHistory(sessionId) {
+  try {
+    console.log('📊 Getting weight history for session:', sessionId);
+    
+    // Get all rated content for this session with timestamps
+    const { data: ratedContent, error: contentError } = await supabase
+      .from('content_v3')
+      .select('id, rating, comment, rated_at, weights_used, created_at')
+      .eq('session_id', sessionId)
+      .not('rating', 'is', null)
+      .order('rated_at', { ascending: true });
+    
+    if (contentError) throw contentError;
+    
+    if (!ratedContent || ratedContent.length === 0) {
+      return {
+        success: true,
+        data: {
+          history: [],
+          parameters: [],
+          snapshots: []
+        }
+      };
+    }
+    
+    // Get current weights
+    const { data: currentWeights, error: weightsError } = await supabase
+      .from('weight_parameters')
+      .select('parameter_name, sub_parameter, weight')
+      .eq('session_id', sessionId);
+    
+    if (weightsError) throw weightsError;
+    
+    // Build weight lookup
+    const weightLookup = {};
+    for (const w of currentWeights) {
+      const key = `${w.parameter_name}.${w.sub_parameter}`;
+      weightLookup[key] = w.weight;
+    }
+    
+    // Collect all unique parameters
+    const allParameters = new Set();
+    for (const content of ratedContent) {
+      if (content.weights_used?.parameters) {
+        for (const param of content.weights_used.parameters) {
+          const key = `${param.parameter}.${param.value}`;
+          allParameters.add(key);
+        }
+      }
+    }
+    
+    // Simulate weight changes over time
+    // Start with initial weight 100 for all
+    const weightHistory = {};
+    for (const param of allParameters) {
+      weightHistory[param] = [{ timestamp: ratedContent[0].created_at, weight: 100, rating: null }];
+    }
+    
+    // Process each rating chronologically
+    for (const content of ratedContent) {
+      if (!content.weights_used?.parameters) continue;
+      
+      const rating = content.rating;
+      const delta = rating * 5; // -3→-15, -1→-5, +1→+5, +3→+15
+      const timestamp = content.rated_at || content.created_at;
+      
+      // Update weights for parameters used in this content
+      for (const param of content.weights_used.parameters) {
+        const key = `${param.parameter}.${param.value}`;
+        
+        // Get last weight
+        const history = weightHistory[key] || [{ timestamp: content.created_at, weight: 100 }];
+        const lastWeight = history[history.length - 1].weight;
+        
+        // Calculate new weight (clamped 0-200)
+        const newWeight = Math.max(0, Math.min(200, lastWeight + delta));
+        
+        // Add to history
+        if (!weightHistory[key]) {
+          weightHistory[key] = [{ timestamp: content.created_at, weight: 100, rating: null }];
+        }
+        
+        weightHistory[key].push({
+          timestamp: timestamp,
+          weight: newWeight,
+          rating: rating,
+          contentId: content.id,
+          comment: content.comment
+        });
+      }
+    }
+    
+    // Convert to array format for charting
+    const parameters = Array.from(allParameters).sort();
+    const snapshots = ratedContent.map((content, index) => ({
+      index: index + 1,
+      timestamp: content.rated_at || content.created_at,
+      rating: content.rating,
+      comment: content.comment,
+      contentId: content.id
+    }));
+    
+    console.log(`✅ Weight history generated: ${parameters.length} parameters, ${snapshots.length} snapshots`);
+    
+    return {
+      success: true,
+      data: {
+        parameters: parameters, // ['lighting.natural', 'pose.sitting', ...]
+        history: weightHistory, // { 'lighting.natural': [{timestamp, weight, rating}, ...], ... }
+        snapshots: snapshots,   // [{index, timestamp, rating, comment}, ...]
+        currentWeights: weightLookup
+      }
+    };
+    
+  } catch (error) {
+    console.error('Failed to get weight history:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
 export default {
   createParametersForCategory,
   initializeSessionWeights,
   selectParametersWeighted,
-  getSessionWeightsVisualization
+  getSessionWeightsVisualization,
+  updateWeightsInstantly,
+  getWeightHistory
 };

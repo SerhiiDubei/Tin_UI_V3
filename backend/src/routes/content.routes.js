@@ -1,6 +1,8 @@
 import express from 'express';
 import supabase from '../db/supabase.js';
 import { generateContent, batchGenerate } from '../services/replicate.service.js';
+// ⚠️ DEPRECATED: This route uses old system without weights
+// For V3 generation with weights, use /api/generation instead
 import { enhancePrompt, detectCategory } from '../services/openai.service.js';
 import { getUserInsights } from '../services/insights.service.js';
 import { getDefaultModel } from '../config/models.js';

@@ -87,6 +87,63 @@
   border-color: transparent;
 }
 
+/* Specific filter button colors */
+.filter-superlike {
+  border-color: #27ae60;
+}
+
+.filter-superlike:hover {
+  background: rgba(39, 174, 96, 0.1);
+  border-color: #27ae60;
+}
+
+.filter-superlike.active {
+  background: #27ae60;
+  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+}
+
+.filter-like {
+  border-color: #3498db;
+}
+
+.filter-like:hover {
+  background: rgba(52, 152, 219, 0.1);
+  border-color: #3498db;
+}
+
+.filter-like.active {
+  background: #3498db;
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.filter-dislike {
+  border-color: #f39c12;
+}
+
+.filter-dislike:hover {
+  background: rgba(243, 156, 18, 0.1);
+  border-color: #f39c12;
+}
+
+.filter-dislike.active {
+  background: #f39c12;
+  box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+}
+
+.filter-superdislike {
+  border-color: #e74c3c;
+}
+
+.filter-superdislike:hover {
+  background: rgba(231, 76, 60, 0.1);
+  border-color: #e74c3c;
+}
+
+.filter-superdislike.active {
+  background: #e74c3c;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+}
+
 .empty-state {
   text-align: center;
   padding: 4rem 2rem;

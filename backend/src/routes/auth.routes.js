@@ -32,14 +32,10 @@ router.post('/login', async (req, res, next) => {
       });
     }
 
-    // For demo: simple password check (NOT SECURE - just for testing)
+    // Simple password check (NOT SECURE - just for demo)
     // In production, use bcrypt.compare(password, users.password_hash)
-    const validPasswords = {
-      'admin': 'admin123',
-      'testuser': 'test123'
-    };
-
-    if (validPasswords[username] !== password) {
+    // Check password from database
+    if (users.password_hash !== password) {
       return res.status(401).json({
         success: false,
         error: 'Invalid username or password'
@@ -95,16 +91,23 @@ router.post('/register', async (req, res, next) => {
       });
     }
 
+    // Prepare user data
+    const userData = {
+      username,
+      email,
+      password_hash: password, // NOT SECURE - just for demo
+      role: 'user'
+    };
+
+    // Add full_name only if provided (column might not exist in older schemas)
+    if (full_name) {
+      userData.full_name = full_name;
+    }
+
     // Insert new user (with simple password for demo)
     const { data: newUser, error } = await supabase
       .from('users')
-      .insert([{
-        username,
-        email,
-        password_hash: password, // NOT SECURE - just for demo
-        full_name: full_name || username,
-        role: 'user'
-      }])
+      .insert([userData])
       .select()
       .single();
 
@@ -112,11 +115,12 @@ router.post('/register', async (req, res, next) => {
       throw error;
     }
 
-    const { password_hash, ...userData } = newUser;
+    // Remove password_hash from response
+    const { password_hash, ...userResponse } = newUser;
     
     res.status(201).json({
       success: true,
-      user: userData,
+      user: userResponse,
       message: 'Registration successful'
     });
 

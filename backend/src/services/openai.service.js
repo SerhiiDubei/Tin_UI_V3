@@ -6,7 +6,14 @@ const openai = new OpenAI({
 });
 
 /**
- * Enhance prompt using GPT-4o with variation support
+ * ⚠️ DEPRECATED: Use agent.service.js + weights.service.js instead!
+ * 
+ * This function does NOT use the weight system.
+ * For V3 generation with weights, use:
+ * - selectParametersWeighted() from weights.service.js
+ * - buildPromptFromParameters() from agent.service.js
+ * 
+ * @deprecated Use V3 generation system
  */
 export async function enhancePrompt(originalPrompt, context = {}) {
   try {
@@ -358,6 +365,11 @@ Write as ONE NATURAL LANGUAGE DESCRIPTION (no tags), starting with filename.`;
 
 /**
  * Detect category from prompt using GPT-4o-mini
+ */
+/**
+ * ⚠️ DEPRECATED: Use agent.service.js detectCategory() instead!
+ * 
+ * @deprecated Use agent.service.js
  */
 export async function detectCategory(prompt, contentType = 'image') {
   try {

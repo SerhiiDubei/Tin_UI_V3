@@ -1,129 +1,122 @@
-import React, { useState, useEffect } from 'react';
-import { insightsAPI, ratingsAPI, contentAPI } from '../services/api';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { projectsAPI, sessionsAPI } from '../services/api-v3';
+import Loading from '../components/Loading';
+import Card from '../components/Card';
 import './DashboardPage.css';
 
 function DashboardPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [dashboardData, setDashboardData] = useState(null);
-  const [stats, setStats] = useState(null);
-  const [topContent, setTopContent] = useState([]);
-  const [userInsights, setUserInsights] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [myContent, setMyContent] = useState([]);
-  const [loadingMyContent, setLoadingMyContent] = useState(false);
-  const [selectedContent, setSelectedContent] = useState(null);
-  const [showContentModal, setShowContentModal] = useState(false);
-  const [userRating, setUserRating] = useState(null);
-  const [loadingRating, setLoadingRating] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [recentSessions, setRecentSessions] = useState([]);
+  const [stats, setStats] = useState({
+    totalProjects: 0,
+    totalSessions: 0,
+    totalGenerations: 0,
+    totalRatings: 0
+  });
 
-  const userId = user?.id || 'demo-user-123';
+  const userId = user?.id;
 
-  useEffect(() => {
-    loadDashboardData();
-    loadMyContent();
-  }, []);
+  const loadDashboardData = useCallback(async () => {
+    if (!userId) {
+      console.log('No userId, skipping dashboard load');
+      setLoading(false);
+      return;
+    }
 
-  const loadDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Load all dashboard data in parallel
-      const [dashboardRes, statsRes, userInsightsRes] = await Promise.all([
-        insightsAPI.getDashboard(),
-        ratingsAPI.getStats(userId),
-        insightsAPI.getUser(userId)
-      ]);
+      console.log('Loading dashboard for user:', userId);
 
-      setDashboardData(dashboardRes.data);
-      setStats(statsRes.data);
-      setUserInsights(userInsightsRes.data);
+      // Load all user projects
+      const projectsResponse = await projectsAPI.getAll(userId);
       
-      // Debug logging
-      console.log('📊 Dashboard data loaded:', {
-        userInsights: userInsightsRes.data,
-        likes: userInsightsRes.data?.likes,
-        dislikes: userInsightsRes.data?.dislikes
+      console.log('Projects response:', projectsResponse);
+
+      if (!projectsResponse.success) {
+        throw new Error(projectsResponse.error || 'Failed to load projects');
+      }
+
+      const projectsList = projectsResponse.data || [];
+      setProjects(projectsList);
+
+      // Load sessions for each project and calculate stats
+      const stats = { totalSessions: 0, totalGenerations: 0, totalRatings: 0 };
+      const allSessions = [];
+
+      for (const project of projectsList) {
+        try {
+          const sessionsResponse = await sessionsAPI.getByProject(project.id);
+          if (sessionsResponse.success && sessionsResponse.data) {
+            const projectSessions = sessionsResponse.data;
+            stats.totalSessions += projectSessions.length;
+            
+            // Add project info to sessions
+            projectSessions.forEach(session => {
+              allSessions.push({
+                ...session,
+                projectName: project.name,
+                projectTag: project.tag,
+                projectId: project.id
+              });
+              
+              // Count generations and ratings if available
+              if (session.generations_count) stats.totalGenerations += session.generations_count;
+              if (session.ratings_count) stats.totalRatings += session.ratings_count;
+            });
+          }
+        } catch (err) {
+          console.error(`Failed to load sessions for project ${project.id}:`, err);
+        }
+      }
+
+      // Sort sessions by date and get recent 5
+      allSessions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      setRecentSessions(allSessions.slice(0, 5));
+
+      setStats({
+        totalProjects: projectsList.length,
+        totalSessions: stats.totalSessions,
+        totalGenerations: stats.totalGenerations,
+        totalRatings: stats.totalRatings
       });
 
-      // Load top content
-      if (dashboardRes.data?.topContent) {
-        const contentPromises = dashboardRes.data.topContent.map(item =>
-          contentAPI.getById(item.id)
-        );
-        const contentResults = await Promise.all(contentPromises);
-        setTopContent(contentResults.map(res => res.data));
-      }
+      console.log('Dashboard loaded successfully');
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
-      setError('Failed to load dashboard data');
+      setError(err.message || 'Невідома помилка');
     } finally {
       setLoading(false);
     }
+  }, [userId]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const handleCreateProject = () => {
+    navigate('/projects');
   };
 
-  const loadMyContent = async () => {
-    try {
-      setLoadingMyContent(true);
-      const response = await contentAPI.list({ userId: userId, limit: 50 });
-      if (response.success && response.content) {
-        setMyContent(response.content);
-      }
-    } catch (err) {
-      console.error('Failed to load my content:', err);
-    } finally {
-      setLoadingMyContent(false);
-    }
+  const handleProjectClick = (projectId) => {
+    navigate(`/projects/${projectId}/sessions`);
   };
 
-  const handleRefreshInsights = async () => {
-    try {
-      setRefreshing(true);
-      await insightsAPI.updateUser(userId);
-      await loadDashboardData();
-    } catch (err) {
-      console.error('Failed to refresh insights:', err);
-      alert('Failed to refresh insights');
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  const handleContentClick = async (content) => {
-    setSelectedContent(content);
-    setShowContentModal(true);
-    setUserRating(null);
-    
-    // Load user's rating for this content
-    try {
-      setLoadingRating(true);
-      const response = await ratingsAPI.list({ userId: userId, contentId: content.id, limit: 1 });
-      if (response.success && response.ratings && response.ratings.length > 0) {
-        setUserRating(response.ratings[0]);
-      }
-    } catch (err) {
-      console.error('Failed to load user rating:', err);
-    } finally {
-      setLoadingRating(false);
-    }
-  };
-
-  const handleCloseModal = () => {
-    setShowContentModal(false);
-    setSelectedContent(null);
-    setUserRating(null);
+  const handleSessionClick = (projectId, sessionId) => {
+    navigate(`/projects/${projectId}/sessions/${sessionId}/generate`);
   };
 
   if (loading) {
     return (
       <div className="dashboard-page">
-        <div className="dashboard-loading">
-          <div className="spinner"></div>
-          <p>Loading dashboard...</p>
-        </div>
+        <Loading text="Завантаження Dashboard..." />
       </div>
     );
   }
@@ -131,494 +124,153 @@ function DashboardPage() {
   if (error) {
     return (
       <div className="dashboard-page">
-        <div className="dashboard-error">
+        <Card className="error-card">
           <p>{error}</p>
-          <button onClick={loadDashboardData}>Retry</button>
-        </div>
+          <button onClick={loadDashboardData} className="retry-btn">Спробувати знову</button>
+        </Card>
       </div>
     );
   }
-
-  const likeRate = stats?.likeRate || 0;
-  const totalRatings = stats?.totalRatings || 0;
-  const totalLikes = Math.round((totalRatings * likeRate) / 100);
-  const totalDislikes = totalRatings - totalLikes;
 
   return (
     <div className="dashboard-page">
       <div className="dashboard-header">
         <h1>📊 Dashboard</h1>
-        <button 
-          className="refresh-button" 
-          onClick={handleRefreshInsights}
-          disabled={refreshing}
-        >
-          {refreshing ? '🔄 Refreshing...' : '🔄 Refresh Insights'}
-        </button>
+        <p className="dashboard-subtitle">Загальна інформація по всіх проектах і сесіях</p>
       </div>
 
       {/* Overall Statistics */}
       <section className="dashboard-section">
-        <h2>📈 Overall Statistics</h2>
+        <h2>📈 Загальна статистика</h2>
         <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon">🖼️</div>
-            <div className="stat-value">{dashboardData?.totalContent || 0}</div>
-            <div className="stat-label">Total Content</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">👆</div>
-            <div className="stat-value">{totalRatings}</div>
-            <div className="stat-label">Total Swipes</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">❤️</div>
-            <div className="stat-value">{totalLikes}</div>
-            <div className="stat-label">Total Likes</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">💔</div>
-            <div className="stat-value">{totalDislikes}</div>
-            <div className="stat-label">Total Dislikes</div>
-          </div>
-          <div className="stat-card highlight">
-            <div className="stat-icon">📊</div>
-            <div className="stat-value">{likeRate.toFixed(1)}%</div>
-            <div className="stat-label">Like Rate</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">⏱️</div>
-            <div className="stat-value">
-              {stats?.avgLatency ? `${(stats.avgLatency / 1000).toFixed(1)}s` : 'N/A'}
-            </div>
-            <div className="stat-label">Avg Response Time</div>
-          </div>
+          <Card className="stat-card">
+            <div className="stat-icon">📁</div>
+            <div className="stat-value">{stats.totalProjects}</div>
+            <div className="stat-label">Проектів</div>
+          </Card>
+          <Card className="stat-card">
+            <div className="stat-icon">📂</div>
+            <div className="stat-value">{stats.totalSessions}</div>
+            <div className="stat-label">Сесій</div>
+          </Card>
+          <Card className="stat-card">
+            <div className="stat-icon">🎨</div>
+            <div className="stat-value">{stats.totalGenerations}</div>
+            <div className="stat-label">Генерацій</div>
+          </Card>
+          <Card className="stat-card">
+            <div className="stat-icon">⭐</div>
+            <div className="stat-value">{stats.totalRatings}</div>
+            <div className="stat-label">Оцінок</div>
+          </Card>
         </div>
       </section>
 
-      {/* User Insights */}
-      {userInsights && (
-        <section className="dashboard-section">
-          <h2>💡 Your Preferences</h2>
-          <div className="insights-container">
-            <div className="insight-category">
-              <h3>👍 You Like</h3>
-              <div className="keyword-list">
-                {userInsights.likes && userInsights.likes.length > 0 ? (
-                  userInsights.likes.slice(0, 10).map((keyword, idx) => (
-                    <span key={idx} className="keyword positive">{keyword}</span>
-                  ))
-                ) : (
-                  <p className="empty-text">No likes yet - start swiping and adding comments!</p>
-                )}
-              </div>
-            </div>
-            <div className="insight-category">
-              <h3>👎 You Dislike</h3>
-              <div className="keyword-list">
-                {userInsights.dislikes && userInsights.dislikes.length > 0 ? (
-                  userInsights.dislikes.slice(0, 10).map((keyword, idx) => (
-                    <span key={idx} className="keyword negative">{keyword}</span>
-                  ))
-                ) : (
-                  <p className="empty-text">No dislikes yet - add comments when you swipe left</p>
-                )}
-              </div>
-            </div>
-            <div className="insight-category">
-              <h3>💭 Suggestions</h3>
-              <div className="keyword-list">
-                {userInsights.suggestions && userInsights.suggestions.length > 0 ? (
-                  userInsights.suggestions.slice(0, 10).map((keyword, idx) => (
-                    <span key={idx} className="keyword neutral">{keyword}</span>
-                  ))
-                ) : (
-                  <p className="empty-text">No suggestions yet - AI will analyze your preferences</p>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="insights-meta">
-            <p>
-              <strong>Insights based on:</strong> {userInsights.totalSwipes || 0} swipes
-            </p>
-            <p>
-              <strong>Last updated:</strong>{' '}
-              {userInsights.updatedAt
-                ? new Date(userInsights.updatedAt).toLocaleString()
-                : 'Never'}
-            </p>
-          </div>
-        </section>
-      )}
-
-      {/* Top Performing Content */}
-      {topContent.length > 0 && (
-        <section className="dashboard-section">
-          <h2>🏆 Top Performing Content</h2>
-          <div className="top-content-grid">
-            {topContent.map((content) => (
-              <div key={content.id} className="content-card">
-                <div className="content-image-wrapper">
-                  {content.mediaType === 'image' ? (
-                    <img src={content.url} alt="Top content" />
-                  ) : (
-                    <video src={content.url} controls />
-                  )}
-                </div>
-                <div className="content-stats">
-                  <div className="content-stat">
-                    <span className="stat-emoji">❤️</span>
-                    <span>{content.likeCount || 0}</span>
-                  </div>
-                  <div className="content-stat">
-                    <span className="stat-emoji">💔</span>
-                    <span>{content.dislikeCount || 0}</span>
-                  </div>
-                  <div className="content-stat">
-                    <span className="stat-emoji">⭐</span>
-                    <span>{content.superlikeCount || 0}</span>
-                  </div>
-                  <div className="content-stat">
-                    <span className="stat-emoji">📊</span>
-                    <span>
-                      {content.totalRatings > 0
-                        ? `${((content.likeCount / content.totalRatings) * 100).toFixed(0)}%`
-                        : '0%'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Active Templates */}
-      {dashboardData?.templates && dashboardData.templates.length > 0 && (
-        <section className="dashboard-section">
-          <h2>📝 Active Templates</h2>
-          <div className="templates-list">
-            {dashboardData.templates.map((template) => (
-              <div key={template.id} className="template-card">
-                <h3>{template.name}</h3>
-                <p className="template-description">{template.description}</p>
-                <div className="template-stats">
-                  <span>📊 {template.contentCount || 0} content items</span>
-                  <span>⏱️ Updated {new Date(template.updatedAt).toLocaleDateString()}</span>
-                </div>
-                {template.likes && template.likes.length > 0 && (
-                  <div className="template-insights">
-                    <p><strong>Top patterns:</strong></p>
-                    <div className="keyword-list">
-                      {template.likes.slice(0, 5).map((keyword, idx) => (
-                        <span key={idx} className="keyword mini">{keyword}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* My Content Section */}
+      {/* Projects Overview */}
       <section className="dashboard-section">
-        <h2>📚 Мій контент</h2>
-        {loadingMyContent ? (
-          <div className="dashboard-loading">
-            <div className="spinner"></div>
-            <p>Завантаження контенту...</p>
-          </div>
-        ) : myContent.length === 0 ? (
-          <div className="empty-content" style={{ textAlign: 'center', padding: '2rem' }}>
-            <p>🎭 Ви ще не створили контент</p>
-            <p style={{ marginTop: '0.5rem', color: '#666' }}>Перейдіть на сторінку генерації, щоб створити свій перший контент</p>
-          </div>
+        <div className="section-header">
+          <h2>📁 Мої проекти</h2>
+          <button onClick={handleCreateProject} className="create-btn">
+            + Створити проект
+          </button>
+        </div>
+        
+        {projects.length === 0 ? (
+          <Card className="empty-state">
+            <div className="empty-icon">📁</div>
+            <p>У вас ще немає проектів</p>
+            <button onClick={handleCreateProject} className="create-btn-large">
+              Створити перший проект
+            </button>
+          </Card>
         ) : (
-          <div className="content-grid" style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
-            gap: '1rem',
-            marginTop: '1rem'
-          }}>
-            {myContent.map((item) => (
-              <div 
-                key={item.id} 
-                className="content-item"
-                onClick={() => handleContentClick(item)}
-                style={{
-                  cursor: 'pointer',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  backgroundColor: 'white'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
+          <div className="projects-grid">
+            {projects.map(project => (
+              <Card 
+                key={project.id} 
+                className="project-card"
+                onClick={() => handleProjectClick(project.id)}
               >
-                {(item.type === 'image' || item.media_type === 'image') && (
-                  <img 
-                    src={item.url} 
-                    alt={item.original_prompt} 
-                    style={{ 
-                      width: '100%', 
-                      height: '200px', 
-                      objectFit: 'cover' 
-                    }} 
-                  />
-                )}
-                {(item.type === 'video' || item.media_type === 'video') && (
-                  <video 
-                    src={item.url} 
-                    style={{ 
-                      width: '100%', 
-                      height: '200px', 
-                      objectFit: 'cover' 
-                    }} 
-                  />
-                )}
-                {(item.type === 'audio' || item.media_type === 'audio') && (
-                  <div style={{ 
-                    width: '100%', 
-                    height: '200px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    backgroundColor: '#f5f5f5',
-                    fontSize: '3rem'
-                  }}>
-                    🎵
-                  </div>
-                )}
-                <div style={{ padding: '0.75rem' }}>
-                  <p style={{ 
-                    fontSize: '0.875rem', 
-                    margin: 0,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    color: '#333'
-                  }}>
-                    {item.original_prompt || item.prompt}
-                  </p>
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    marginTop: '0.5rem',
-                    fontSize: '0.75rem',
-                    color: '#666'
-                  }}>
-                    <span style={{ 
-                      padding: '0.25rem 0.5rem',
-                      backgroundColor: '#667eea',
-                      color: 'white',
-                      borderRadius: '4px'
-                    }}>
-                      {item.type || item.media_type}
-                    </span>
-                  </div>
+                <div className="project-tag">{project.tag}</div>
+                <h3>{project.name}</h3>
+                {project.description && <p className="project-description">{project.description}</p>}
+                <div className="project-meta">
+                  <span>📂 {project.sessions_count || 0} сесій</span>
+                  <span>🎨 {project.generations_count || 0} генерацій</span>
                 </div>
-              </div>
+                <div className="project-date">
+                  Створено: {new Date(project.created_at).toLocaleDateString('uk-UA')}
+                </div>
+              </Card>
             ))}
           </div>
         )}
       </section>
 
-      {/* Content Modal */}
-      {showContentModal && selectedContent && (
-        <div 
-          className="modal-overlay"
-          onClick={handleCloseModal}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem'
-          }}
-        >
-          <div 
-            className="modal-content"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              maxWidth: '800px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              position: 'relative'
-            }}
-          >
-            <button
-              onClick={handleCloseModal}
-              style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                background: 'rgba(0, 0, 0, 0.5)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '50%',
-                width: '36px',
-                height: '36px',
-                fontSize: '1.5rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1
-              }}
-            >
-              ×
-            </button>
-            
-            <div style={{ padding: '2rem' }}>
-              {(selectedContent.type === 'image' || selectedContent.media_type === 'image') && (
-                <img 
-                  src={selectedContent.url} 
-                  alt={selectedContent.original_prompt}
-                  style={{ 
-                    width: '100%', 
-                    borderRadius: '8px',
-                    marginBottom: '1rem'
-                  }}
-                />
-              )}
-              {(selectedContent.type === 'video' || selectedContent.media_type === 'video') && (
-                <video 
-                  src={selectedContent.url} 
-                  controls
-                  style={{ 
-                    width: '100%', 
-                    borderRadius: '8px',
-                    marginBottom: '1rem'
-                  }}
-                />
-              )}
-              {(selectedContent.type === 'audio' || selectedContent.media_type === 'audio') && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ 
-                    padding: '2rem',
-                    backgroundColor: '#f5f5f5',
-                    borderRadius: '8px',
-                    textAlign: 'center',
-                    fontSize: '4rem',
-                    marginBottom: '1rem'
-                  }}>
-                    🎵
+      {/* Recent Sessions */}
+      {recentSessions.length > 0 && (
+        <section className="dashboard-section">
+          <h2>📂 Останні сесії</h2>
+          <div className="sessions-list">
+            {recentSessions.map(session => (
+              <Card 
+                key={session.id}
+                className="session-card"
+                onClick={() => handleSessionClick(session.projectId, session.id)}
+              >
+                <div className="session-info">
+                  <div className="session-name">{session.name}</div>
+                  <div className="session-project">
+                    <span className="project-tag-small">{session.projectTag}</span>
+                    <span>{session.projectName}</span>
                   </div>
-                  <audio src={selectedContent.url} controls style={{ width: '100%' }} />
-                </div>
-              )}
-              
-              <h3 style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>Prompt</h3>
-              <p style={{ color: '#666', lineHeight: '1.6' }}>
-                {selectedContent.original_prompt || selectedContent.prompt}
-              </p>
-              
-              {selectedContent.enhanced_prompt && (
-                <>
-                  <h3 style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>Enhanced Prompt</h3>
-                  <p style={{ color: '#666', lineHeight: '1.6', fontSize: '0.9rem' }}>
-                    {selectedContent.enhanced_prompt}
-                  </p>
-                </>
-              )}
-              
-              {/* User's Rating */}
-              {loadingRating ? (
-                <div style={{ 
-                  marginTop: '1rem', 
-                  padding: '1rem', 
-                  backgroundColor: '#f0f0f0',
-                  borderRadius: '8px',
-                  textAlign: 'center'
-                }}>
-                  <p style={{ margin: 0, color: '#666' }}>Завантаження вашого рейтингу...</p>
-                </div>
-              ) : userRating ? (
-                <div style={{ 
-                  marginTop: '1rem', 
-                  padding: '1rem', 
-                  backgroundColor: userRating.direction === 'right' || userRating.direction === 'up' ? '#e8f5e9' : '#ffebee',
-                  borderRadius: '8px',
-                  border: `2px solid ${userRating.direction === 'right' || userRating.direction === 'up' ? '#4caf50' : '#f44336'}`
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '1.5rem' }}>
-                      {userRating.direction === 'right' && '👍'}
-                      {userRating.direction === 'left' && '👎'}
-                      {userRating.direction === 'up' && '⭐'}
-                      {userRating.direction === 'down' && '🔄'}
-                    </span>
-                    <strong style={{ color: '#333' }}>
-                      Ваша оцінка: {' '}
-                      {userRating.direction === 'right' && 'Лайк'}
-                      {userRating.direction === 'left' && 'Дизлайк'}
-                      {userRating.direction === 'up' && 'Суперлайк'}
-                      {userRating.direction === 'down' && 'Reroll'}
-                    </strong>
-                  </div>
-                  {userRating.comment && (
-                    <p style={{ 
-                      marginTop: '0.5rem', 
-                      marginBottom: 0,
-                      fontSize: '0.875rem', 
-                      color: '#666',
-                      fontStyle: 'italic'
-                    }}>
-                      💬 "{userRating.comment}"
-                    </p>
+                  {session.user_prompt && (
+                    <div className="session-prompt">
+                      💬 {session.user_prompt}
+                    </div>
                   )}
                 </div>
-              ) : (
-                <div style={{ 
-                  marginTop: '1rem', 
-                  padding: '1rem', 
-                  backgroundColor: '#fff3e0',
-                  borderRadius: '8px',
-                  border: '2px dashed #ff9800',
-                  textAlign: 'center'
-                }}>
-                  <p style={{ margin: 0, color: '#666' }}>
-                    ℹ️ Ви ще не оцінили цей контент
-                  </p>
+                <div className="session-stats">
+                  <span>🎨 {session.generations_count || 0}</span>
+                  <span>⭐ {session.ratings_count || 0}</span>
+                  <span>📅 {new Date(session.created_at).toLocaleDateString('uk-UA')}</span>
                 </div>
-              )}
-            
-              
-              {selectedContent.created_at && (
-                <p style={{ 
-                  marginTop: '1rem', 
-                  fontSize: '0.875rem', 
-                  color: '#999',
-                  textAlign: 'center'
-                }}>
-                  Created: {new Date(selectedContent.created_at).toLocaleString()}
-                </p>
-              )}
-            </div>
+              </Card>
+            ))}
           </div>
-        </div>
+        </section>
+      )}
+
+      {/* Quick Start Guide */}
+      {projects.length === 0 && (
+        <section className="dashboard-section">
+          <Card className="guide-card">
+            <h2>🚀 Швидкий старт</h2>
+            <div className="guide-steps">
+              <div className="guide-step">
+                <div className="step-number">1</div>
+                <div className="step-content">
+                  <h3>Створіть проект</h3>
+                  <p>Проект - це контейнер для ваших генерацій. Наприклад: "Dating профіль", "Машини", "Дизайн логотипів"</p>
+                </div>
+              </div>
+              <div className="guide-step">
+                <div className="step-number">2</div>
+                <div className="step-content">
+                  <h3>Створіть сесію</h3>
+                  <p>Сесія - це робоча сесія в межах проекту. Тут AI буде навчатись на ваших оцінках</p>
+                </div>
+              </div>
+              <div className="guide-step">
+                <div className="step-number">3</div>
+                <div className="step-content">
+                  <h3>Генеруйте і оцінюйте</h3>
+                  <p>Генеруйте контент, оцінюйте результати. Система навчиться і наступні генерації будуть кращими!</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </section>
       )}
     </div>
   );

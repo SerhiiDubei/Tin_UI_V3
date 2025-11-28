@@ -1,17 +1,63 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { projectsAPI, sessionsAPI, generationAPI } from '../services/api-v3';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Loading from '../components/Loading';
-import SwipeCard from '../components/SwipeCard';
 import './GeneratePageV3.css';
 
+// Доступні моделі для генерації
+const AVAILABLE_MODELS = [
+  {
+    key: 'seedream-4',
+    name: '🌟 Seedream 4',
+    description: 'Висока якість, 2K роздільність',
+    speed: '~1 хв',
+    price: '$0.03',
+    recommended: true
+  },
+  {
+    key: 'nano-banana-pro',
+    name: '🍌 Nano Banana Pro',
+    description: 'Gemini SOTA, швидко',
+    speed: '~45 сек',
+    price: '$0.025',
+    recommended: false
+  },
+  {
+    key: 'flux-schnell',
+    name: '⚡ FLUX Schnell',
+    description: 'Найшвидша генерація',
+    speed: '~30 сек',
+    price: '$0.003',
+    recommended: false
+  },
+  {
+    key: 'flux-dev',
+    name: '🎨 FLUX Dev',
+    description: 'Максимальна деталізація',
+    speed: '~2 хв',
+    price: '$0.025',
+    recommended: false
+  },
+  {
+    key: 'sdxl',
+    name: '🔮 Stable Diffusion XL',
+    description: 'Стабільна класика',
+    speed: '~1 хв',
+    price: '$0.008',
+    recommended: false
+  }
+];
+
 function GeneratePageV3() {
+  const { user } = useAuth();
   const [project, setProject] = useState(null);
   const [session, setSession] = useState(null);
   const [prompt, setPrompt] = useState('');
+  const [selectedModel, setSelectedModel] = useState('seedream-4');
+  const [count, setCount] = useState(10);
   const [generating, setGenerating] = useState(false);
   const [generatedItems, setGeneratedItems] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -20,16 +66,20 @@ function GeneratePageV3() {
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [comment, setComment] = useState('');
   const [pendingRating, setPendingRating] = useState(null);
+  const [showCompletionScreen, setShowCompletionScreen] = useState(false);
+  const [loadingNext, setLoadingNext] = useState(false);
+  const [generationComplete, setGenerationComplete] = useState(false);
   
-  const { user } = useAuth();
+  // Swipe state
+  const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
+  const [touchEnd, setTouchEnd] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  
   const { projectId, sessionId } = useParams();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadProjectAndSession();
-  }, [projectId, sessionId]);
-
-  const loadProjectAndSession = async () => {
+  const loadProjectAndSession = useCallback(async () => {
     try {
       const projectResponse = await projectsAPI.getById(projectId);
       if (projectResponse.success) {
@@ -43,7 +93,11 @@ function GeneratePageV3() {
     } catch (err) {
       setError('Помилка завантаження: ' + err.message);
     }
-  };
+  }, [projectId, sessionId]);
+
+  useEffect(() => {
+    loadProjectAndSession();
+  }, [loadProjectAndSession]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -54,34 +108,56 @@ function GeneratePageV3() {
     setGenerating(true);
     setGeneratedItems([]);
     setCurrentIndex(0);
-    setProgress({ current: 0, total: 10 });
+    setProgress({ current: 0, total: count });
     setError(null);
+    setLoadingNext(false);
+    setGenerationComplete(false);
 
     try {
-      // Step-by-step generation
-      const response = await generationAPI.generate({
-        session_id: sessionId,
-        prompt: prompt,
-        count: 10,
-        model: 'seedream-4'
-      });
-
-      if (response.success && response.data.items) {
-        // Process items as they arrive
-        const items = response.data.items;
-        setGeneratedItems(items);
-        setProgress({ current: items.length, total: 10 });
+      // 🔥 STREAMING GENERATION: генеруємо по одному
+      for (let i = 0; i < count; i++) {
+        console.log(`🎨 Generating ${i + 1}/${count}...`);
         
-        if (items.length === 0) {
-          setError('Не вдалося згенерувати контент');
+        try {
+          const response = await generationAPI.generate({
+            sessionId: sessionId,
+            projectId: projectId,
+            userId: user.id,
+            userPrompt: prompt,
+            count: 1,              // 🔥 По одному!
+            model: selectedModel
+          });
+
+          if (response.success && response.results && response.results[0]?.success) {
+            const newItem = response.results[0].content;
+            
+            // Додаємо нове фото одразу
+            setGeneratedItems(prev => [...prev, newItem]);
+            setProgress({ current: i + 1, total: count });
+            
+            // Якщо це перше фото - вимикаємо повний loader
+            if (i === 0) {
+              setGenerating(false);
+              setLoadingNext(true); // Наступні генеруються в фоні
+            }
+            
+            console.log(`✅ Generated ${i + 1}/${count}`);
+          } else {
+            console.error(`❌ Failed generation ${i + 1}`);
+          }
+        } catch (err) {
+          console.error(`Error generating ${i + 1}:`, err);
         }
-      } else {
-        throw new Error('Помилка генерації');
       }
+      
+      // Всі згенеровані
+      setGenerationComplete(true);
+      setLoadingNext(false);
+      
     } catch (err) {
       setError(err.message || 'Помилка генерації контенту');
-    } finally {
       setGenerating(false);
+      setLoadingNext(false);
     }
   };
 
@@ -104,20 +180,34 @@ function GeneratePageV3() {
   const submitRating = async () => {
     if (!pendingRating) return;
 
-    try {
-      await generationAPI.rate({
-        session_id: sessionId,
-        content_id: pendingRating.content_id,
-        direction: pendingRating.direction,
-        comment: comment || null
-      });
+    // Конвертуємо rating
+    const ratingMap = {
+      'up': 3,
+      'right': 1,
+      'left': -1,
+      'super-down': -3,
+      'down': 0
+    };
 
-      setShowCommentModal(false);
-      setComment('');
-      setPendingRating(null);
-      moveToNext();
+    const ratingData = {
+      contentId: pendingRating.content_id,
+      rating: ratingMap[pendingRating.direction],
+      comment: comment || null
+    };
+
+    // 🔥 Закриваємо modal і переходимо далі ОДРАЗУ (не чекаємо API)
+    setShowCommentModal(false);
+    setComment('');
+    setPendingRating(null);
+    moveToNext();
+
+    // Відправляємо rating в фоні
+    try {
+      await generationAPI.rate(ratingData);
+      console.log('✅ Rating saved in background');
     } catch (err) {
-      alert('Помилка збереження оцінки: ' + err.message);
+      console.error('❌ Failed to save rating:', err);
+      // Не показуємо alert щоб не переривати flow
     }
   };
 
@@ -129,15 +219,136 @@ function GeneratePageV3() {
   };
 
   const moveToNext = () => {
+    // Якщо є наступне фото - показуємо
     if (currentIndex < generatedItems.length - 1) {
       setCurrentIndex(currentIndex + 1);
-    } else {
-      // All items rated
-      alert('Всі зображення оцінені! Ви можете згенерувати ще.');
-      setGeneratedItems([]);
-      setCurrentIndex(0);
-      setPrompt('');
+    } 
+    // Якщо генерація ще йде - нічого не робимо (loader покаже)
+    else if (loadingNext || generating) {
+      // Залишаємось на поточному індексі, UI покаже loader
+      console.log('⏳ Waiting for next generation...');
     }
+    // Якщо все згенеровано і оцінено - показуємо completion
+    else if (generationComplete) {
+      setShowCompletionScreen(true);
+    }
+  };
+
+  const handleGenerateMore = () => {
+    setShowCompletionScreen(false);
+    setGeneratedItems([]);
+    setCurrentIndex(0);
+    setPrompt('');
+    setLoadingNext(false);
+    setGenerationComplete(false);
+  };
+
+  const handleViewGallery = () => {
+    navigate(`/projects/${projectId}/sessions/${sessionId}/gallery`);
+  };
+
+  // Touch handlers for swipe
+  const handleTouchStart = (e) => {
+    setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    setTouchEnd({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging) return;
+    
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    
+    setTouchEnd({ x: currentX, y: currentY });
+    setDragOffset({
+      x: currentX - touchStart.x,
+      y: currentY - touchStart.y
+    });
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    
+    const deltaX = touchEnd.x - touchStart.x;
+    const deltaY = touchEnd.y - touchStart.y;
+    const minSwipeDistance = 50;
+    
+    // Determine swipe direction
+    if (Math.abs(deltaY) > Math.abs(deltaX)) {
+      // Vertical swipe
+      if (Math.abs(deltaY) > minSwipeDistance) {
+        if (deltaY > 0) {
+          // Swipe down - Skip
+          handleSwipe('down');
+        } else {
+          // Swipe up - Superlike (+3)
+          handleSwipe('up');
+        }
+      }
+    } else {
+      // Horizontal swipe
+      if (Math.abs(deltaX) > minSwipeDistance) {
+        if (deltaX > 0) {
+          // Swipe right - Like (+1)
+          handleSwipe('right');
+        } else {
+          // Swipe left - Dislike (-1)
+          handleSwipe('left');
+        }
+      }
+    }
+    
+    // Reset drag offset
+    setDragOffset({ x: 0, y: 0 });
+  };
+
+  // Mouse handlers (for desktop)
+  const handleMouseDown = (e) => {
+    setTouchStart({ x: e.clientX, y: e.clientY });
+    setTouchEnd({ x: e.clientX, y: e.clientY });
+    setIsDragging(true);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    
+    setTouchEnd({ x: e.clientX, y: e.clientY });
+    setDragOffset({
+      x: e.clientX - touchStart.x,
+      y: e.clientY - touchStart.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    
+    const deltaX = touchEnd.x - touchStart.x;
+    const deltaY = touchEnd.y - touchStart.y;
+    const minSwipeDistance = 80;
+    
+    // Determine swipe direction
+    if (Math.abs(deltaY) > Math.abs(deltaX)) {
+      if (Math.abs(deltaY) > minSwipeDistance) {
+        if (deltaY > 0) {
+          handleSwipe('down');
+        } else {
+          handleSwipe('up');
+        }
+      }
+    } else {
+      if (Math.abs(deltaX) > minSwipeDistance) {
+        if (deltaX > 0) {
+          handleSwipe('right');
+        } else {
+          handleSwipe('left');
+        }
+      }
+    }
+    
+    setDragOffset({ x: 0, y: 0 });
   };
 
   const currentItem = generatedItems[currentIndex];
@@ -183,10 +394,73 @@ function GeneratePageV3() {
           <Card className="prompt-card-v3">
             <h2>✨ Генерація AI контенту</h2>
             <p className="prompt-hint">
-              {session.content_count === 0
+              {session.generations_count === 0
                 ? '🆕 Це перша генерація в цій сесії. Агент створить нові параметри на основі вашого prompt.'
                 : '📊 Агент проаналізує попередні оцінки та створить оптимізований контент.'}
             </p>
+
+            {/* Model Selection */}
+            <div className="form-section">
+              <label className="form-label">🤖 Оберіть модель AI:</label>
+              <div className="models-grid">
+                {AVAILABLE_MODELS.map(model => (
+                  <div
+                    key={model.key}
+                    className={`model-card ${selectedModel === model.key ? 'selected' : ''} ${model.recommended ? 'recommended' : ''}`}
+                    onClick={() => setSelectedModel(model.key)}
+                  >
+                    {model.recommended && <span className="recommended-badge">Рекомендовано</span>}
+                    <div className="model-name">{model.name}</div>
+                    <div className="model-description">{model.description}</div>
+                    <div className="model-stats">
+                      <span className="model-speed">⏱️ {model.speed}</span>
+                      <span className="model-price">💰 {model.price}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Count Selection */}
+            <div className="form-section">
+              <label className="form-label">📊 Кількість генерацій:</label>
+              
+              <div className="count-input-wrapper">
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={count}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 1;
+                    setCount(Math.min(1000, Math.max(1, val)));
+                  }}
+                  placeholder="Введіть кількість"
+                  className="count-input-field"
+                />
+                <span className="count-label">зображень</span>
+              </div>
+
+              <div className="count-quick-buttons">
+                <span className="quick-label">Швидкий вибір:</span>
+                {[1, 5, 10, 20, 50, 100].map(num => (
+                  <button
+                    key={num}
+                    type="button"
+                    className={`count-quick-btn ${count === num ? 'active' : ''}`}
+                    onClick={() => setCount(num)}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+
+              <div className="count-info">
+                <span>⏱️ ~{Math.ceil(count * 1)} хв</span>
+                <span>💰 ~${(count * 0.03).toFixed(2)}</span>
+                <span>📊 {count} {count === 1 ? 'зображення' : count < 5 ? 'зображення' : 'зображень'}</span>
+              </div>
+            </div>
 
             <div className="form-section">
               <label className="form-label">Ваш Prompt:</label>
@@ -207,13 +481,13 @@ function GeneratePageV3() {
               <div className="info-item">
                 <span className="info-icon">🤖</span>
                 <div>
-                  <strong>Модель:</strong> Seedream 4
+                  <strong>Модель:</strong> {AVAILABLE_MODELS.find(m => m.key === selectedModel)?.name || 'Seedream 4'}
                 </div>
               </div>
               <div className="info-item">
                 <span className="info-icon">📷</span>
                 <div>
-                  <strong>Кількість:</strong> 10 зображень
+                  <strong>Кількість:</strong> {count} {count === 1 ? 'зображення' : count < 5 ? 'зображення' : 'зображень'}
                 </div>
               </div>
               <div className="info-item">
@@ -251,16 +525,97 @@ function GeneratePageV3() {
           </Card>
         )}
 
+        {/* Completion Screen */}
+        {showCompletionScreen && (
+          <Card className="completion-card-v3">
+            <div className="completion-content">
+              <div className="completion-icon">🎉</div>
+              <h2>Всі зображення оцінені!</h2>
+              <p className="completion-text">
+                Ви оцінили {generatedItems.length} {generatedItems.length === 1 ? 'зображення' : generatedItems.length < 5 ? 'зображення' : 'зображень'}.
+                <br />
+                Система навчилася на ваших оцінках!
+              </p>
+              
+              <div className="completion-stats">
+                <div className="stat-item">
+                  <span className="stat-icon">📊</span>
+                  <span className="stat-label">Оцінено</span>
+                  <span className="stat-value">{generatedItems.length}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-icon">🎯</span>
+                  <span className="stat-label">Проект</span>
+                  <span className="stat-value">{project?.name}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-icon">📁</span>
+                  <span className="stat-label">Сесія</span>
+                  <span className="stat-value">{session?.name}</span>
+                </div>
+              </div>
+
+              <div className="completion-actions">
+                <button 
+                  className="btn-primary-v3 completion-btn"
+                  onClick={handleGenerateMore}
+                >
+                  <span className="btn-icon">🎨</span>
+                  <span>Згенерувати ще</span>
+                </button>
+                <button 
+                  className="btn-secondary-v3 completion-btn"
+                  onClick={handleViewGallery}
+                >
+                  <span className="btn-icon">🖼️</span>
+                  <span>Переглянути галерею</span>
+                </button>
+              </div>
+
+              <p className="completion-hint">
+                💡 Наступні генерації будуть кращими завдяки вашим оцінкам!
+              </p>
+            </div>
+          </Card>
+        )}
+
+        {/* Loading Next Item */}
+        {!generating && !showCompletionScreen && generatedItems.length > 0 && !currentItem && loadingNext && (
+          <Card className="loading-next-card-v3">
+            <div className="loading-next-content">
+              <div className="loading-spinner-large"></div>
+              <h2>⏳ Генерується наступне зображення...</h2>
+              <p className="loading-next-text">
+                Згенеровано: {progress.current} з {progress.total}
+              </p>
+              <div className="progress-bar">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                ></div>
+              </div>
+              <p className="loading-hint">
+                💡 Зображення з'являться автоматично, як тільки будуть готові
+              </p>
+            </div>
+          </Card>
+        )}
+
         {/* Swipe Section */}
-        {!generating && generatedItems.length > 0 && currentItem && (
+        {!generating && !showCompletionScreen && generatedItems.length > 0 && currentItem && (
           <div className="swipe-section-v3">
             <div className="swipe-header-v3">
               <h2>
-                👆 Оцініть зображення {currentIndex + 1} з {generatedItems.length}
+                👆 Оцініть зображення {currentIndex + 1} з {progress.total}
               </h2>
               <div className="swipe-progress-badges">
                 <span className="badge-current">Поточне: {currentIndex + 1}</span>
-                <span className="badge-remaining">Залишилось: {generatedItems.length - currentIndex - 1}</span>
+                <span className="badge-remaining">Оцінено: {currentIndex}</span>
+                {loadingNext && (
+                  <span className="badge-generating">
+                    🎨 Генерується: {progress.current}/{progress.total}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -274,30 +629,96 @@ function GeneratePageV3() {
                 </div>
               </Card>
 
-              {/* Center: Swipe Card */}
-              <div className="swipe-card-container-v3">
-                <SwipeCard
-                  content={currentItem}
-                  onSwipe={handleSwipe}
-                />
-                <div className="swipe-instructions-v3">
-                  <div className="instruction-item">
-                    <span className="arrow">←</span>
-                    <span>Dislike</span>
-                  </div>
-                  <div className="instruction-item">
-                    <span className="arrow">→</span>
-                    <span>Like</span>
-                  </div>
-                  <div className="instruction-item">
-                    <span className="arrow">↑</span>
-                    <span>Superlike</span>
-                  </div>
-                  <div className="instruction-item">
-                    <span className="arrow">↓</span>
-                    <span>Skip</span>
-                  </div>
+              {/* Center: Image & Rating Buttons */}
+              <div className="rating-card-container-v3">
+                <Card 
+                  className="image-card-v3"
+                  style={{
+                    transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) rotate(${dragOffset.x * 0.05}deg)`,
+                    transition: isDragging ? 'none' : 'transform 0.3s ease',
+                    cursor: isDragging ? 'grabbing' : 'grab'
+                  }}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={() => isDragging && handleMouseUp()}
+                >
+                  <img 
+                    src={currentItem.url} 
+                    alt="Generated content" 
+                    className="generated-image-v3"
+                    draggable={false}
+                  />
+                  
+                  {/* Swipe indicators */}
+                  {isDragging && (
+                    <>
+                      {Math.abs(dragOffset.x) > Math.abs(dragOffset.y) && Math.abs(dragOffset.x) > 30 && (
+                        <div className={`swipe-indicator ${dragOffset.x > 0 ? 'right' : 'left'}`}>
+                          {dragOffset.x > 0 ? '👍 +1' : '👎 -1'}
+                        </div>
+                      )}
+                      {Math.abs(dragOffset.y) > Math.abs(dragOffset.x) && Math.abs(dragOffset.y) > 30 && (
+                        <div className={`swipe-indicator ${dragOffset.y > 0 ? 'down' : 'up'}`}>
+                          {dragOffset.y > 0 ? '⏭️ Пропустити' : '🔥 +3'}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </Card>
+                
+                {/* 4 Rating Buttons (method.txt style) */}
+                <div className="rating-buttons-v3">
+                  <button
+                    className="rating-btn super-dislike"
+                    onClick={() => handleSwipe('super-down')}
+                    title="Супер дизлайк: -15 до всіх параметрів"
+                  >
+                    <span className="rating-icon">😡</span>
+                    <span className="rating-label">Жахливо</span>
+                    <span className="rating-value">-3</span>
+                  </button>
+                  
+                  <button
+                    className="rating-btn dislike"
+                    onClick={() => handleSwipe('left')}
+                    title="Дизлайк: -5 до всіх параметрів"
+                  >
+                    <span className="rating-icon">👎</span>
+                    <span className="rating-label">Не подобається</span>
+                    <span className="rating-value">-1</span>
+                  </button>
+                  
+                  <button
+                    className="rating-btn like"
+                    onClick={() => handleSwipe('right')}
+                    title="Лайк: +5 до всіх параметрів"
+                  >
+                    <span className="rating-icon">👍</span>
+                    <span className="rating-label">Подобається</span>
+                    <span className="rating-value">+1</span>
+                  </button>
+                  
+                  <button
+                    className="rating-btn super-like"
+                    onClick={() => handleSwipe('up')}
+                    title="Супер лайк: +15 до всіх параметрів"
+                  >
+                    <span className="rating-icon">🔥</span>
+                    <span className="rating-label">Чудово!</span>
+                    <span className="rating-value">+3</span>
+                  </button>
                 </div>
+                
+                <button
+                  className="skip-btn-v3"
+                  onClick={() => handleSwipe('down')}
+                >
+                  ⏭️ Пропустити (без оцінки)
+                </button>
               </div>
 
               {/* Right: Enhanced Prompt */}
