@@ -377,16 +377,61 @@ GitHub Actions автоматично забілдить і задеплоїть
 
 ### 🐛 Troubleshooting Deploy
 
+#### ❌ "Failed to fetch" при логіні
+
+**Причини:**
+
+1. **CORS не налаштований:**
+   - Vercel Dashboard → Settings → Environment Variables
+   - `CORS_ORIGINS` ОБОВ'ЯЗКОВО має містити:
+     ```
+     https://yourusername.github.io
+     ```
+   - БЕЗ `/Tin_UI_V3/` в кінці!
+   - Після зміни натисніть **Redeploy**
+
+2. **Невірний REACT_APP_API_URL:**
+   - GitHub Repository → Settings → Secrets and variables → Actions
+   - Перевірте `REACT_APP_API_URL`:
+     ```
+     https://your-backend.vercel.app/api
+     ```
+   - З `/api` в кінці!
+   - Після зміни push до GitHub для rebuild
+
+3. **Backend не працює:**
+   - Відкрийте: `https://your-backend.vercel.app/api/health`
+   - Має показати JSON з статусом
+   - Якщо помилка → Vercel Dashboard → Deployments → Logs
+
+4. **Старий build кешований:**
+   - На GitHub Pages hard refresh: `Ctrl+Shift+R` (Windows) або `Cmd+Shift+R` (Mac)
+   - Перевірте що API URL правильний: F12 → Network → login request → Headers
+
+**Швидка перевірка:**
+
+```bash
+# 1. Перевірте backend (замініть YOUR_URL)
+curl https://your-backend.vercel.app/api/health
+
+# 2. Перевірте CORS (замініть обидва URL)
+curl -H "Origin: https://yourusername.github.io" -H "Access-Control-Request-Method: POST" -X OPTIONS https://your-backend.vercel.app/api/auth/login -v
+
+# Має показати: Access-Control-Allow-Origin: https://yourusername.github.io
+```
+
+---
+
 **CORS Error:**
 ```
 Рішення: Vercel → Settings → Environment Variables → 
-CORS_ORIGINS має містити точний URL GitHub Pages
+CORS_ORIGINS має містити точний URL GitHub Pages БЕЗ trailing slash
 ```
 
 **API не відповідає:**
 ```
 Vercel Dashboard → Deployments → Logs
-Перевірте Environment Variables
+Перевірте Environment Variables (особливо SUPABASE_URL, SUPABASE_KEY)
 ```
 
 **Build fails на GitHub:**

@@ -253,25 +253,43 @@ Tin_UI_V3/
 
 ## 🚢 Deployment
 
-📖 **Детальна інструкція: [DEPLOYMENT.md](./DEPLOYMENT.md)**
+📖 **Детальна інструкція: [SETUP.md](./SETUP.md#-деплой-в-production)**
 
 ### Quick Deploy
 
 **Backend → Vercel:**
-```bash
-cd backend
-vercel
-```
+1. Go to [vercel.com](https://vercel.com) → Add New Project
+2. Import repository → **Root Directory: `backend`**
+3. Add Environment Variables:
+   ```
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_KEY=your_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   OPENAI_API_KEY=sk-your-key
+   CORS_ORIGINS=https://yourusername.github.io
+   NODE_ENV=production
+   ```
+4. Deploy!
 
 **Frontend → GitHub Pages:**
-```bash
-git push origin main
-# Автоматично задеплоїться через GitHub Actions
-```
+1. Repository Settings → Secrets → Add:
+   - `REACT_APP_API_URL` = `https://your-backend.vercel.app/api`
+2. Settings → Pages → Source: **GitHub Actions**
+3. Push to main branch:
+   ```bash
+   git push origin main
+   ```
 
 ### Production URLs
 - **Backend API:** `https://your-project.vercel.app/api`
 - **Frontend:** `https://yourusername.github.io/Tin_UI_V3/`
+
+### ⚠️ Common Issues
+
+**"Failed to fetch" при логіні:**
+- Перевірте `CORS_ORIGINS` в Vercel містить точний GitHub Pages URL
+- Перевірте `REACT_APP_API_URL` в GitHub Secrets
+- Hard refresh (Ctrl+Shift+R) після deploy
 
 ---
 
