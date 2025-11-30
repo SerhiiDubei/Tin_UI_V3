@@ -1,6 +1,7 @@
 import { supabase } from '../db/supabase.js';
 import OpenAI from 'openai';
 import config from '../config/index.js';
+import { DATING_PARAMETERS } from '../config/dating-parameters.js';
 
 const openai = new OpenAI({
   apiKey: config.openai.apiKey
@@ -24,10 +25,27 @@ const openai = new OpenAI({
  * @returns {Object} Parameter structure with 11-14 categories
  */
 export async function createParametersForCategory(category, userPrompt) {
-  console.log('\n🤖 CREATING DYNAMIC PARAMETERS');
+  console.log('\n🤖 CREATING PARAMETERS FOR CATEGORY');
   console.log('Category:', category);
   console.log('User Prompt:', userPrompt);
   
+  // 🎯 SPECIAL CASE: Dating uses fixed MASTER PROMPT parameters
+  if (category === 'dating') {
+    console.log('✅ Using FIXED Dating Parameters (MASTER PROMPT based)');
+    return {
+      success: true,
+      parameters: DATING_PARAMETERS,
+      metadata: {
+        category: 'dating',
+        categoriesCount: Object.keys(DATING_PARAMETERS).length,
+        totalSubParameters: Object.values(DATING_PARAMETERS).reduce((sum, arr) => sum + arr.length, 0),
+        type: 'fixed',
+        source: 'MASTER_PROMPT'
+      }
+    };
+  }
+  
+  // For other categories: use dynamic GPT-4o generation
   try {
     const systemPrompt = `You are an AI parameter architect. Create a comprehensive parameter system for ${category} generation.
 
@@ -95,7 +113,7 @@ Return ONLY valid JSON with 11-14 categories, each having 4-6 options.`;
       }
     }
     
-    console.log('✅ Parameters created:');
+    console.log('✅ Dynamic Parameters created:');
     console.log(`   Categories: ${Object.keys(parameters).length}`);
     console.log(`   Total sub-parameters: ${Object.values(parameters).reduce((sum, arr) => sum + arr.length, 0)}`);
     
@@ -105,7 +123,9 @@ Return ONLY valid JSON with 11-14 categories, each having 4-6 options.`;
       metadata: {
         category,
         categoriesCount: categoryCount,
-        totalSubParameters: Object.values(parameters).reduce((sum, arr) => sum + arr.length, 0)
+        totalSubParameters: Object.values(parameters).reduce((sum, arr) => sum + arr.length, 0),
+        type: 'dynamic',
+        source: 'GPT-4o'
       }
     };
     

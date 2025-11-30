@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import config from '../config/index.js';
 import { supabase } from '../db/supabase.js';
+import { getParameterDescription, getImperfections } from '../config/dating-parameters.js';
 
 const openai = new OpenAI({
   apiKey: config.openai.apiKey
@@ -22,14 +23,13 @@ const openai = new OpenAI({
  * @returns {Object} Enhanced prompt ready for generation
  */
 export async function buildPromptFromParameters(userPrompt, selectedParams, agentType = 'general', category = null, sessionId = null) {
-  console.log('\n🤖 BUILDING PROMPT WITH AGENT');
+  console.log('\n🤖 BUILDING PROMPT (HYBRID APPROACH)');
   console.log('Agent Type:', agentType);
   console.log('Category:', category);
   console.log('User Prompt:', userPrompt);
-  console.log('Selected Parameters:', Object.keys(selectedParams).length);
   
   try {
-    // Get agent config
+    // Get agent config (містить MASTER PROMPT для dating)
     const { data: agentConfig, error } = await supabase
       .from('agent_configs')
       .select('*')
@@ -99,6 +99,8 @@ Return ONLY the final prompt text, nothing else.`
     });
     
     const duration = Date.now() - startTime;
+    console.log(`✅ GPT-4o response received (${duration}ms)`);
+    
     const enhancedPrompt = response.choices[0].message.content.trim();
     
     console.log('\n✅ PROMPT BUILT SUCCESSFULLY');
@@ -136,6 +138,39 @@ Return ONLY the final prompt text, nothing else.`
  * Convert selected parameters to natural language description
  */
 function convertParametersToDescription(selectedParams, category) {
+  // 🎯 SPECIAL CASE: Dating uses MASTER PROMPT descriptions
+  if (category === 'dating') {
+    const lines = [];
+    const descriptions = [];
+    
+    // Get smartphone_style first (foundation)
+    if (selectedParams.smartphone_style) {
+      const styleDesc = getParameterDescription('smartphone_style', selectedParams.smartphone_style.value);
+      descriptions.push(`📱 DEVICE: ${styleDesc} (weight: ${Math.round(selectedParams.smartphone_style.weight)})`);
+      
+      // Add imperfections based on style
+      const imperfections = getImperfections(selectedParams.smartphone_style.value);
+      descriptions.push(`🔧 IMPERFECTIONS: ${imperfections.join(', ')}`);
+    }
+    
+    // Add all other parameters with natural descriptions
+    for (const [param, data] of Object.entries(selectedParams)) {
+      if (param === 'smartphone_style') continue; // Already added
+      
+      const desc = getParameterDescription(param, data.value);
+      descriptions.push(`  - ${param.toUpperCase()}: ${desc} (weight: ${Math.round(data.weight)})`);
+    }
+    
+    lines.push('🎯 DATING PHOTO PARAMETERS (MASTER PROMPT):');
+    lines.push(...descriptions);
+    lines.push('');
+    lines.push('⚠️ REMEMBER: Use natural flowing language, NOT parameter tags!');
+    lines.push('⚠️ Include the imperfections listed above for authenticity!');
+    
+    return lines.join('\n');
+  }
+  
+  // For other categories: use original logic
   const lines = [];
   
   // Group parameters by type

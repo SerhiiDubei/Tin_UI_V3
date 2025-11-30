@@ -36,11 +36,10 @@ function SettingsPage() {
           
           // Отримати деталі сесій для підрахунку позитивних/негативних оцінок
           const sessionsResponse = await sessionsAPI.getByProject(project.id);
-          if (sessionsResponse.success) {
-            for (const session of sessionsResponse.data) {
-              // Можна додатково підрахувати позитивні/негативні з content_v3
-              // Але це потребує додаткового API
-            }
+          if (sessionsResponse.success && sessionsResponse.data) {
+            // Можна додатково підрахувати позитивні/негативні з content_v3
+            // Але це потребує додаткового API
+            // sessionsResponse.data містить всі сесії проекту
           }
         }
         

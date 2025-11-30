@@ -164,6 +164,16 @@ function GeneratePageV3() {
   const handleSwipe = async (direction) => {
     const currentItem = generatedItems[currentIndex];
     
+    // 🔥 UX FIX: Перевірка чи наступне фото вже готове
+    const isLastItem = currentIndex === generatedItems.length - 1;
+    
+    // Якщо це останнє фото і генерація ще йде - блокуємо!
+    if (isLastItem && (loadingNext || generating)) {
+      console.log('⏳ Next photo is not ready yet, please wait...');
+      // Користувач бачить warning під кнопками
+      return;
+    }
+    
     if (direction === 'down') {
       // Skip - no rating
       moveToNext();
@@ -675,6 +685,7 @@ function GeneratePageV3() {
                   <button
                     className="rating-btn super-dislike"
                     onClick={() => handleSwipe('super-down')}
+                    disabled={currentIndex === generatedItems.length - 1 && (loadingNext || generating)}
                     title="Супер дизлайк: -15 до всіх параметрів"
                   >
                     <span className="rating-icon">😡</span>
@@ -685,6 +696,7 @@ function GeneratePageV3() {
                   <button
                     className="rating-btn dislike"
                     onClick={() => handleSwipe('left')}
+                    disabled={currentIndex === generatedItems.length - 1 && (loadingNext || generating)}
                     title="Дизлайк: -5 до всіх параметрів"
                   >
                     <span className="rating-icon">👎</span>
@@ -695,6 +707,7 @@ function GeneratePageV3() {
                   <button
                     className="rating-btn like"
                     onClick={() => handleSwipe('right')}
+                    disabled={currentIndex === generatedItems.length - 1 && (loadingNext || generating)}
                     title="Лайк: +5 до всіх параметрів"
                   >
                     <span className="rating-icon">👍</span>
@@ -705,6 +718,7 @@ function GeneratePageV3() {
                   <button
                     className="rating-btn super-like"
                     onClick={() => handleSwipe('up')}
+                    disabled={currentIndex === generatedItems.length - 1 && (loadingNext || generating)}
                     title="Супер лайк: +15 до всіх параметрів"
                   >
                     <span className="rating-icon">🔥</span>
@@ -713,9 +727,18 @@ function GeneratePageV3() {
                   </button>
                 </div>
                 
+                {/* Показуємо warning якщо наступне фото не готове */}
+                {currentIndex === generatedItems.length - 1 && (loadingNext || generating) && (
+                  <div className="next-photo-loading-warning">
+                    <span className="loading-spinner-small"></span>
+                    <span>⏳ Генерується наступне фото ({progress.current}/{progress.total})...</span>
+                  </div>
+                )}
+                
                 <button
                   className="skip-btn-v3"
                   onClick={() => handleSwipe('down')}
+                  disabled={currentIndex === generatedItems.length - 1 && (loadingNext || generating)}
                 >
                   ⏭️ Пропустити (без оцінки)
                 </button>

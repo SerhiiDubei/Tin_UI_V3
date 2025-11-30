@@ -14,7 +14,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function applyMigration() {
   console.log('📦 Reading migration file...');
   
-  const migrationPath = join(__dirname, 'migrations', '003_update_content_table.sql');
+  const migrationPath = join(__dirname, 'COMPLETE_MIGRATION.sql');
   const sql = readFileSync(migrationPath, 'utf8');
   
   console.log('🚀 Applying migration to Supabase...');

@@ -287,100 +287,112 @@ pm2 stop all
 
 ---
 
-## 🚢 Деплой
+## 🚢 Деплой в Production
 
-### Frontend на Vercel
+### 📦 Backend на Vercel
+
+#### Метод 1: Через Vercel Dashboard (рекомендовано)
 
 1. **Підготовка:**
-```bash
-cd frontend
-npm run build
-```
+   - Запустіть `CREATE_ENV_FILES.bat` для створення .env.example файлів
+   - Підготуйте всі API ключі (Supabase, OpenAI, Replicate)
 
-2. **Деплой через Vercel CLI:**
+2. **Deploy:**
+   - Зайдіть на [vercel.com](https://vercel.com) 
+   - Натисніть "Add New Project"
+   - Імпортуйте ваш GitHub репозиторій
+   - **Root Directory:** `backend` ⚠️ ВАЖЛИВО!
+   - Build Command: (порожнє)
+   - Install Command: `npm install`
+
+3. **Environment Variables:**
+   Додайте всі змінні в Settings → Environment Variables:
+   ```env
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_KEY=your_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   OPENAI_API_KEY=sk-your-key
+   REPLICATE_API_TOKEN=r8_your-token
+   GEMINI_API_KEY=your-gemini-key
+   CORS_ORIGINS=http://localhost:3000,https://yourusername.github.io
+   NODE_ENV=production
+   PORT=5000
+   ```
+
+4. **Натисніть "Deploy"** і збережіть отриманий URL!
+
+#### Метод 2: Через Vercel CLI
+
 ```bash
-npm install -g vercel
+npm i -g vercel
+cd backend
 vercel login
 vercel --prod
 ```
 
-3. **Або через GitHub:**
-- Push код на GitHub
-- Імпортуйте в Vercel
-- Встановіть environment variables:
-  - `REACT_APP_API_URL`: URL вашого backend
+---
 
-### Backend на Railway/Render
+### 🌐 Frontend на GitHub Pages
 
-**Railway:**
-```bash
-# Встановити Railway CLI
-npm install -g @railway/cli
+#### Налаштування GitHub Repository
 
-# Логін
-railway login
+1. **GitHub Secrets:**
+   - Settings → Secrets and variables → Actions
+   - Додайте secret:
+     - Name: `REACT_APP_API_URL`
+     - Value: `https://your-backend-url.vercel.app/api`
 
-# Деплой
-cd backend
-railway up
+2. **Enable GitHub Pages:**
+   - Settings → Pages
+   - Source: **GitHub Actions** ⚠️
+
+3. **Deploy:**
+   ```bash
+   git add .
+   git commit -m "Deploy to production"
+   git push origin main
+   ```
+
+GitHub Actions автоматично забілдить і задеплоїть frontend!
+
+4. **Перевірка:**
+   - Actions → "Deploy Frontend to GitHub Pages"
+   - Після завершення: `https://yourusername.github.io/Tin_UI_V3/`
+
+---
+
+### ⚠️ Важливо після deploy
+
+1. **Оновіть CORS:**
+   - В Vercel Dashboard → Environment Variables
+   - Оновіть `CORS_ORIGINS` з вашим GitHub Pages URL
+   - Натисніть "Redeploy"
+
+2. **Тестування:**
+   - Backend: `https://your-backend.vercel.app/api/health`
+   - Frontend: відкрийте сайт, залогіньтесь, створіть проект
+   - Перевірте Console (F12) на помилки CORS
+
+---
+
+### 🐛 Troubleshooting Deploy
+
+**CORS Error:**
+```
+Рішення: Vercel → Settings → Environment Variables → 
+CORS_ORIGINS має містити точний URL GitHub Pages
 ```
 
-**Render:**
-1. Створіть Web Service
-2. Підключіть GitHub репозиторій
-3. Build Command: `cd backend && npm install`
-4. Start Command: `cd backend && npm start`
-5. Додайте Environment Variables з `.env`
-
-### Backend на VPS (Ubuntu)
-
-```bash
-# Підключитись до VPS
-ssh user@your-server.com
-
-# Встановити Node.js
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Встановити PM2
-sudo npm install -g pm2
-
-# Клонувати проект
-git clone <your-repo>
-cd Tin_UI_V3/backend
-
-# Встановити залежності
-npm install
-
-# Створити .env файл
-nano .env
-# (вставити конфігурацію)
-
-# Запустити з PM2
-pm2 start src/server.js --name tin-backend
-pm2 startup
-pm2 save
-
-# Налаштувати Nginx
-sudo apt install nginx
-sudo nano /etc/nginx/sites-available/tin-backend
+**API не відповідає:**
+```
+Vercel Dashboard → Deployments → Logs
+Перевірте Environment Variables
 ```
 
-**Nginx конфігурація:**
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    location /api {
-        proxy_pass http://localhost:5000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
+**Build fails на GitHub:**
+```
+Actions logs → перевірте помилку
+Переконайтеся що REACT_APP_API_URL в Secrets
 ```
 
 ---
@@ -560,4 +572,5 @@ pm2 logs tin-backend
 ---
 
 **Успішного налаштування! 🚀**
+
 

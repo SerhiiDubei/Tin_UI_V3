@@ -668,6 +668,50 @@
   pointer-events: none;
 }
 
+/* Next Photo Loading Warning */
+.next-photo-loading-warning {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #ffeaa7, #fdcb6e);
+  border-radius: 12px;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #2d3436;
+  box-shadow: 0 4px 12px rgba(253, 203, 110, 0.3);
+  animation: pulseWarning 2s ease-in-out infinite;
+}
+
+@keyframes pulseWarning {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.02); opacity: 0.95; }
+}
+
+.loading-spinner-small {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(45, 52, 54, 0.2);
+  border-top-color: #2d3436;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Disabled rating buttons */
+.rating-btn:disabled,
+.skip-btn-v3:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.rating-btn:disabled:hover {
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
 /* Prompt Card */
 .prompt-card-v3 {
   background: white;

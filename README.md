@@ -253,19 +253,25 @@ Tin_UI_V3/
 
 ## 🚢 Deployment
 
-### Frontend (Vercel)
-```bash
-cd frontend
-npm run build
-# Deploy 'build' folder to Vercel
-```
+📖 **Детальна інструкція: [DEPLOYMENT.md](./DEPLOYMENT.md)**
 
-### Backend (PM2)
+### Quick Deploy
+
+**Backend → Vercel:**
 ```bash
 cd backend
-pm2 start src/server.js --name tin-ui-backend
-pm2 save
+vercel
 ```
+
+**Frontend → GitHub Pages:**
+```bash
+git push origin main
+# Автоматично задеплоїться через GitHub Actions
+```
+
+### Production URLs
+- **Backend API:** `https://your-project.vercel.app/api`
+- **Frontend:** `https://yourusername.github.io/Tin_UI_V3/`
 
 ---
 
