@@ -2,7 +2,7 @@
   "name": "tinder-ai-feedback-frontend",
   "version": "1.0.0",
   "private": true,
-  "homepage": "./",
+  "homepage": "https://serhiidubei.github.io/Tin_UI_V3/",
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
