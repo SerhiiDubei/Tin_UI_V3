@@ -49,8 +49,8 @@ export const config = {
   
   cors: {
     origins: process.env.CORS_ORIGINS 
-      ? process.env.CORS_ORIGINS.split(',')
-      : ['http://localhost:3000']
+      ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+      : ['http://localhost:3000', 'https://serhiidubei.github.io']
   },
   
   rateLimit: parseInt(process.env.RATE_LIMIT) || 100,

@@ -11,10 +11,21 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: config.cors.origins,
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (config.cors.origins.indexOf(origin) !== -1 || config.cors.origins.includes('*')) {
+      callback(null, true);
+    } else {
+      console.warn(`⚠️  CORS blocked origin: ${origin}`);
+      console.warn(`   Allowed origins: ${config.cors.origins.join(', ')}`);
+      callback(null, true); // Allow anyway for now to debug
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -64,28 +75,36 @@ async function startServer() {
       console.log('   Files will use temporary URLs until bucket is created.');
     }
     
-    // Start listening
-    app.listen(config.port, () => {
-      console.log('');
-      console.log('🚀 Server started successfully!');
-      console.log('');
-      console.log(`📡 API running on: http://localhost:${config.port}`);
-      console.log(`🌍 Environment: ${config.nodeEnv}`);
-      console.log(`📊 CORS origins: ${config.cors.origins.join(', ')}`);
-      console.log('');
-      console.log('Available endpoints:');
-      console.log(`  - Health: http://localhost:${config.port}/api/health`);
-      console.log(`  - Content: http://localhost:${config.port}/api/content`);
-      console.log(`  - Ratings: http://localhost:${config.port}/api/ratings`);
-      console.log(`  - Insights: http://localhost:${config.port}/api/insights`);
-      console.log('');
-      console.log('Press Ctrl+C to stop');
-      console.log('');
-    });
+    // Start listening (only in non-serverless environment)
+    if (process.env.VERCEL !== '1') {
+      app.listen(config.port, () => {
+        console.log('');
+        console.log('🚀 Server started successfully!');
+        console.log('');
+        console.log(`📡 API running on: http://localhost:${config.port}`);
+        console.log(`🌍 Environment: ${config.nodeEnv}`);
+        console.log(`📊 CORS origins: ${config.cors.origins.join(', ')}`);
+        console.log('');
+        console.log('Available endpoints:');
+        console.log(`  - Health: http://localhost:${config.port}/api/health`);
+        console.log(`  - Content: http://localhost:${config.port}/api/content`);
+        console.log(`  - Ratings: http://localhost:${config.port}/api/ratings`);
+        console.log(`  - Insights: http://localhost:${config.port}/api/insights`);
+        console.log('');
+        console.log('Press Ctrl+C to stop');
+        console.log('');
+      });
+    }
   } catch (error) {
     console.error('❌ Failed to start server:', error);
-    process.exit(1);
+    if (process.env.VERCEL !== '1') {
+      process.exit(1);
+    }
   }
 }
 
+// Initialize server
 startServer();
+
+// Export for Vercel serverless
+export default app;
