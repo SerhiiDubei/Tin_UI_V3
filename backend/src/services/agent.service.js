@@ -10,6 +10,10 @@ const openai = new OpenAI({
 /**
  * Agent Service - Smart prompt building with weights
  * Supports multiple agents: Dating, General, etc.
+ * 
+ * LEARNING SYSTEM:
+ * 1. User feedback (weights) - PRIMARY learning (what user likes)
+ * 2. QA feedback (technical) - SECONDARY learning (technical correctness)
  */
 
 /**
@@ -61,6 +65,18 @@ export async function buildPromptFromParameters(userPrompt, selectedParams, agen
       }
     }
     
+    // 🔍 LOAD QA FEEDBACK FROM PREVIOUS GENERATIONS
+    let qaFeedbackSection = '';
+    if (sessionId) {
+      const qaResult = await loadSessionQAHistory(sessionId);
+      if (qaResult.success && qaResult.commonIssues.length > 0) {
+        console.log('\n🔍 QA FEEDBACK LOADED:', qaResult.commonIssues.length, 'common issues');
+        qaFeedbackSection = buildQAFeedbackSection(qaResult);
+      } else {
+        console.log('\n🔍 No QA feedback found');
+      }
+    }
+    
     // Build final prompt using AI
     const messages = [
       {
@@ -74,7 +90,7 @@ export async function buildPromptFromParameters(userPrompt, selectedParams, agen
 USER REQUEST: ${userPrompt}
 
 PARAMETER CONSTRAINTS (selected by AI based on user preferences):
-${parameterDescription}${commentsSection}
+${parameterDescription}${commentsSection}${qaFeedbackSection}
 
 IMPORTANT:
 - Combine user request with parameter constraints naturally
@@ -82,7 +98,7 @@ IMPORTANT:
 - Don't mention technical parameters explicitly
 - Create flowing, natural description
 - For dating: follow Seedream 4.0 style (smartphone photo realism)
-- For other categories: adapt style appropriately${commentsSection ? '\n- 🔥 CRITICAL: Apply user feedback from comments above (HIGH PRIORITY!)' : ''}
+- For other categories: adapt style appropriately${commentsSection ? '\n- 🔥 CRITICAL: Apply user feedback from comments above (HIGH PRIORITY!)' : ''}${qaFeedbackSection ? '\n- 🔍 CRITICAL: Avoid technical issues listed by QA Agent above!' : ''}
 
 Return ONLY the final prompt text, nothing else.`
       }
@@ -463,8 +479,123 @@ function buildCommentsSection(comments) {
   return section;
 }
 
+/**
+ * Load QA validation history from previous generations in this session
+ * Analyzes common issues to help agent avoid them
+ * 
+ * @param {string} sessionId 
+ * @returns {Object}
+ */
+async function loadSessionQAHistory(sessionId) {
+  try {
+    const { data: contents, error } = await supabase
+      .from('content_v3')
+      .select('qa_validation, created_at')
+      .eq('session_id', sessionId)
+      .not('qa_validation', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(20); // Last 20 QA validations
+    
+    if (error) throw error;
+    
+    if (!contents || contents.length === 0) {
+      return {
+        success: true,
+        history: [],
+        commonIssues: [],
+        avgScore: null
+      };
+    }
+    
+    // Collect all issues
+    const allIssues = [];
+    const scores = [];
+    
+    for (const content of contents) {
+      const qa = content.qa_validation;
+      if (qa.score !== undefined) scores.push(qa.score);
+      if (qa.issues && qa.issues.length > 0) {
+        allIssues.push(...qa.issues);
+      }
+    }
+    
+    // Find common issues (appearing 2+ times)
+    const issueFrequency = {};
+    allIssues.forEach(issue => {
+      const key = issue.message;
+      if (!issueFrequency[key]) {
+        issueFrequency[key] = {
+          count: 0,
+          severity: issue.severity,
+          type: issue.type
+        };
+      }
+      issueFrequency[key].count++;
+    });
+    
+    // Get issues that appear 2+ times
+    const commonIssues = Object.entries(issueFrequency)
+      .filter(([_, data]) => data.count >= 2)
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([message, data]) => ({
+        message,
+        count: data.count,
+        severity: data.severity
+      }));
+    
+    const avgScore = scores.length > 0 
+      ? Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length)
+      : null;
+    
+    return {
+      success: true,
+      history: contents.map(c => c.qa_validation),
+      commonIssues,
+      avgScore,
+      totalValidations: contents.length
+    };
+    
+  } catch (error) {
+    console.error('Error loading QA history:', error);
+    return {
+      success: false,
+      history: [],
+      commonIssues: [],
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Build QA feedback section for GPT-4o prompt
+ * @param {Object} qaResult 
+ * @returns {string}
+ */
+function buildQAFeedbackSection(qaResult) {
+  if (!qaResult.commonIssues || qaResult.commonIssues.length === 0) return '';
+  
+  let section = '\n\n🔍 QA AGENT FEEDBACK (Technical issues to AVOID):';
+  
+  section += `\n\nQA Average Score: ${qaResult.avgScore}/100`;
+  section += `\nValidations analyzed: ${qaResult.totalValidations}`;
+  
+  section += '\n\n⚠️ COMMON TECHNICAL ISSUES (fix these!):';
+  qaResult.commonIssues.forEach((issue, i) => {
+    section += `\n  ${i + 1}. [${issue.severity}] ${issue.message} (appeared ${issue.count}x)`;
+  });
+  
+  section += '\n\n💡 QA INSTRUCTIONS:';
+  section += '\n  - These are TECHNICAL issues QA agent found repeatedly';
+  section += '\n  - Fix them to improve QA score (target: 85+)';
+  section += '\n  - User feedback (above) is MORE important than QA';
+  section += '\n  - But avoid technical mistakes that QA catches!';
+  
+  return section;
+}
+
 export default {
   buildPromptFromParameters,
   detectCategory,
-  analyzeSessionHistory
+  analyzeSessionHistory,
+  loadSessionQAHistory
 };

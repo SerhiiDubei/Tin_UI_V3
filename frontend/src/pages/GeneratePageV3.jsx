@@ -59,6 +59,7 @@ function GeneratePageV3() {
   const [prompt, setPrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState('seedream-4');
   const [count, setCount] = useState(10);
+  const [enableQA, setEnableQA] = useState(true); // QA включено за замовчуванням
   const [generating, setGenerating] = useState(false);
   const [generatedItems, setGeneratedItems] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -144,7 +145,8 @@ function GeneratePageV3() {
         userId: user.id,
         userPrompt: prompt,
         count: count,              // 🔥 Всі одразу!
-        model: selectedModel
+        model: selectedModel,
+        enableQA: enableQA         // 🔍 QA валідація
       });
 
       console.log('📦 Received generation response:', response);
@@ -667,6 +669,53 @@ function GeneratePageV3() {
               </div>
             </div>
 
+            {/* QA Toggle */}
+            <div className="qa-toggle-section" style={{
+              marginTop: '1rem',
+              padding: '1rem',
+              background: enableQA ? '#e3f2fd' : '#f5f5f5',
+              borderRadius: '8px',
+              border: enableQA ? '2px solid #2196f3' : '1px solid #ddd'
+            }}>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                gap: '0.75rem'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={enableQA}
+                  onChange={(e) => setEnableQA(e.target.checked)}
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    cursor: 'pointer'
+                  }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: enableQA ? '#1976d2' : '#666',
+                    marginBottom: '0.25rem'
+                  }}>
+                    🔍 QA Валідація промптів
+                  </div>
+                  <div style={{
+                    fontSize: '0.85rem',
+                    color: '#666',
+                    lineHeight: '1.4'
+                  }}>
+                    {enableQA 
+                      ? '✅ AI перевіряє якість промптів перед генерацією (слідкує за помилками агента)'
+                      : '⚠️ Валідація вимкнена - промпти генеруються без перевірки'
+                    }
+                  </div>
+                </div>
+              </label>
+            </div>
+
             <Button
               onClick={handleGenerate}
               disabled={!prompt.trim()}
@@ -912,6 +961,89 @@ function GeneratePageV3() {
                   <span className="meta-info">{currentItem.model || 'GPT-4o + Seedream 4'}</span>
                 </div>
               </Card>
+
+              {/* QA Validation Results */}
+              {currentItem.qa_validation && (
+                <Card className="qa-results-card" style={{
+                  marginTop: '1rem',
+                  background: currentItem.qa_validation.status === 'approved' ? '#e8f5e9' : 
+                              currentItem.qa_validation.status === 'needs_revision' ? '#fff3e0' : '#ffebee',
+                  border: `2px solid ${currentItem.qa_validation.status === 'approved' ? '#4caf50' : 
+                                        currentItem.qa_validation.status === 'needs_revision' ? '#ff9800' : '#f44336'}`
+                }}>
+                  <h3 style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem',
+                    fontSize: '1rem',
+                    marginBottom: '0.75rem'
+                  }}>
+                    🔍 QA Валідація
+                    <span style={{
+                      marginLeft: 'auto',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '12px',
+                      fontSize: '0.85rem',
+                      fontWeight: '600',
+                      background: currentItem.qa_validation.status === 'approved' ? '#4caf50' : 
+                                  currentItem.qa_validation.status === 'needs_revision' ? '#ff9800' : '#f44336',
+                      color: 'white'
+                    }}>
+                      {currentItem.qa_validation.score}/100
+                    </span>
+                  </h3>
+                  
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <div style={{
+                      display: 'inline-block',
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      fontWeight: '600',
+                      background: currentItem.qa_validation.status === 'approved' ? '#4caf50' : 
+                                  currentItem.qa_validation.status === 'needs_revision' ? '#ff9800' : '#f44336',
+                      color: 'white'
+                    }}>
+                      {currentItem.qa_validation.status === 'approved' ? '✅ Схвалено' :
+                       currentItem.qa_validation.status === 'needs_revision' ? '⚠️ Потребує покращення' :
+                       '❌ Відхилено'}
+                    </div>
+                  </div>
+
+                  {currentItem.qa_validation.issues && currentItem.qa_validation.issues.length > 0 && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      padding: '0.75rem',
+                      background: 'rgba(255,255,255,0.5)',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem'
+                    }}>
+                      <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#d32f2f' }}>
+                        ⚠️ Знайдено проблем: {currentItem.qa_validation.issues.length}
+                      </div>
+                      {currentItem.qa_validation.issues.map((issue, idx) => (
+                        <div key={idx} style={{ 
+                          marginBottom: '0.25rem',
+                          paddingLeft: '1rem',
+                          color: '#666'
+                        }}>
+                          • [{issue.severity}] {issue.message}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {(!currentItem.qa_validation.issues || currentItem.qa_validation.issues.length === 0) && (
+                    <div style={{
+                      fontSize: '0.85rem',
+                      color: '#2e7d32',
+                      fontStyle: 'italic'
+                    }}>
+                      ✨ Проблем не знайдено! Промпт відповідає всім правилам.
+                    </div>
+                  )}
+                </Card>
+              )}
             </div>
           </div>
         )}

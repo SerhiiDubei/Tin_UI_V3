@@ -250,6 +250,48 @@ export const visionAPI = {
 };
 
 // ==========================================
+// QA API (Quality Assurance)
+// ==========================================
+
+export const qaAPI = {
+  /**
+   * Validate a prompt (full AI-powered validation)
+   * @param {Object} promptData - Prompt validation data
+   */
+  validate: async (promptData) => {
+    return request('/qa/validate', {
+      method: 'POST',
+      body: JSON.stringify(promptData)
+    });
+  },
+  
+  /**
+   * Quick validation (rule-based, fast)
+   * @param {string} enhancedPrompt - Prompt to validate
+   * @param {string} agentType - 'dating' or 'general'
+   * @param {string} model - Model ID
+   */
+  quickValidate: async (enhancedPrompt, agentType, model) => {
+    return request('/qa/quick-validate', {
+      method: 'POST',
+      body: JSON.stringify({
+        enhancedPrompt,
+        agentType,
+        model
+      })
+    });
+  },
+  
+  /**
+   * Get QA statistics for a session
+   * @param {string} sessionId - Session ID
+   */
+  getStats: async (sessionId) => {
+    return request(`/qa/stats?sessionId=${sessionId}`);
+  }
+};
+
+// ==========================================
 // HEALTH CHECK
 // ==========================================
 
@@ -264,6 +306,7 @@ const apiV3Service = {
   sessions: sessionsAPI,
   generation: generationAPI,
   vision: visionAPI,
+  qa: qaAPI,
   health: healthAPI
 };
 
