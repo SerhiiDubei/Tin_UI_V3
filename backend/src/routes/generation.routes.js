@@ -5,6 +5,7 @@ import { buildPromptFromParameters } from '../services/agent.service.js';
 import { generateImage as generateImageReplicate } from '../services/replicate.service.js';
 import { generateImage as generateImageGenSpark } from '../services/genspark.service.js';
 import { MODELS_CONFIG, getModelsForType } from '../config/models.js';
+import { quickValidate } from '../services/qa-agent.service.js';
 
 const router = express.Router();
 
@@ -59,7 +60,8 @@ router.post('/generate', async (req, res) => {
       userId, 
       userPrompt, 
       count = 1,
-      model = 'seedream-4'
+      model = 'seedream-4',
+      enableQA = false  // Optional QA validation
     } = req.body;
     
     if (!sessionId || !projectId || !userId || !userPrompt) {
@@ -168,6 +170,31 @@ router.post('/generate', async (req, res) => {
             
             const enhancedPrompt = promptResult.prompt;
             
+            // Step 2.5: QA Validation (Optional)
+            let qaResult = null;
+            if (enableQA) {
+              console.log(`🔍 [${itemNumber}/${count}] Running QA validation...`);
+              qaResult = await quickValidate(enhancedPrompt, agentType, model);
+              
+              if (qaResult.success) {
+                console.log(`📊 [${itemNumber}/${count}] QA Score: ${qaResult.validation.score}/100 - ${qaResult.validation.status}`);
+                
+                if (qaResult.validation.issues && qaResult.validation.issues.length > 0) {
+                  console.log(`⚠️  [${itemNumber}/${count}] QA Issues found:`, qaResult.validation.issues.length);
+                  qaResult.validation.issues.forEach(issue => {
+                    console.log(`   - [${issue.severity}] ${issue.message}`);
+                  });
+                }
+                
+                // If validation failed critically, skip generation
+                if (qaResult.validation.status === 'rejected') {
+                  throw new Error(`QA rejected prompt: ${qaResult.validation.issues[0]?.message || 'Quality too low'}`);
+                }
+              } else {
+                console.warn(`⚠️  [${itemNumber}/${count}] QA validation failed:`, qaResult.error);
+              }
+            }
+            
             // Step 3: Generate image
             console.log(`🎨 [${itemNumber}/${count}] Generating image with`, model);
             
@@ -194,6 +221,15 @@ router.post('/generate', async (req, res) => {
               }))
             };
             
+            // Include QA results if validation was performed
+            const qaSnapshot = qaResult?.success ? {
+              validated: true,
+              score: qaResult.validation.score,
+              status: qaResult.validation.status,
+              issues: qaResult.validation.issues || [],
+              timestamp: new Date().toISOString()
+            } : null;
+            
             const { data: content, error: contentError } = await supabase
               .from('content_v3')
               .insert([{
@@ -207,7 +243,8 @@ router.post('/generate', async (req, res) => {
                 final_prompt: enhancedPrompt,
                 model: model,
                 agent_type: agentType,
-                weights_used: weightsSnapshot
+                weights_used: weightsSnapshot,
+                qa_validation: qaSnapshot
               }])
               .select()
               .single();

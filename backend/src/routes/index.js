@@ -8,6 +8,7 @@ import projectsRoutes from './projects.routes.js';
 import sessionsRoutes from './sessions.routes.js';
 import generationRoutes from './generation.routes.js';
 import visionRoutes from './vision.routes.js';
+import qaRoutes from './qa.routes.js';
 
 const router = express.Router();
 
@@ -26,6 +27,7 @@ router.use('/projects', projectsRoutes);
 router.use('/sessions', sessionsRoutes);
 router.use('/generation', generationRoutes);
 router.use('/vision', visionRoutes);
+router.use('/qa', qaRoutes);
 
 // V2 Routes (legacy support)
 router.use('/content', contentRoutes);
