@@ -5,6 +5,7 @@ import { projectsAPI, sessionsAPI, generationAPI } from '../services/api-v3';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Loading from '../components/Loading';
+import PhotoUploadModal from '../components/PhotoUpload/PhotoUploadModal';
 import './GeneratePageV3.css';
 
 // Доступні моделі для генерації
@@ -71,6 +72,10 @@ function GeneratePageV3() {
   const [generationComplete, setGenerationComplete] = useState(false);
   const [unratedStats, setUnratedStats] = useState(null);
   const [loadingUnrated, setLoadingUnrated] = useState(false);
+  
+  // Photo upload modal state
+  const [showPhotoUploadModal, setShowPhotoUploadModal] = useState(false);
+  const [generatedPromptData, setGeneratedPromptData] = useState(null);
   
   // Swipe state
   const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
@@ -278,6 +283,31 @@ function GeneratePageV3() {
 
   const handleViewGallery = () => {
     navigate(`/projects/${projectId}/sessions/${sessionId}/gallery`);
+  };
+
+  const handlePhotoUpload = () => {
+    setShowPhotoUploadModal(true);
+  };
+
+  const handlePromptGenerated = (generatedPrompt, analysisData) => {
+    console.log('✅ Prompt generated from photos:', generatedPrompt);
+    console.log('Analysis data:', analysisData);
+    
+    // Set the generated prompt
+    setPrompt(generatedPrompt);
+    
+    // Store analysis data for potential "Generate More" use
+    setGeneratedPromptData({
+      prompt: generatedPrompt,
+      analysis: analysisData,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Close modal
+    setShowPhotoUploadModal(false);
+    
+    // Show success message
+    alert('✅ Prompt згенеровано з ваших фото! Тепер можете запустити генерацію.');
   };
 
   const handleResumeRating = async () => {
@@ -562,7 +592,32 @@ function GeneratePageV3() {
             </div>
 
             <div className="form-section">
-              <label className="form-label">Ваш Prompt:</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <label className="form-label" style={{ margin: 0 }}>Ваш Prompt:</label>
+                <button
+                  type="button"
+                  onClick={handlePhotoUpload}
+                  className="photo-upload-btn"
+                  style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                  📸 Upload Photos
+                </button>
+              </div>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
@@ -570,10 +625,25 @@ function GeneratePageV3() {
 
 Приклад для Dating: "Beautiful woman on the beach at sunset"
 Приклад для Cars: "Red sports car on mountain road"
-Приклад для Insurance: "Happy family with insurance protection"`}
+Приклад для Insurance: "Happy family with insurance protection"
+
+АБО натисніть "Upload Photos" щоб завантажити фото для AI аналізу!`}
                 rows={5}
                 className="prompt-textarea"
               />
+              {generatedPromptData && (
+                <div style={{
+                  marginTop: '0.5rem',
+                  padding: '0.75rem',
+                  background: '#e8f5e9',
+                  border: '1px solid #4caf50',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  color: '#2e7d32'
+                }}>
+                  ✅ Prompt згенеровано з фото · Аналізовано {generatedPromptData.analysis?.imageCount || 'N/A'} фото
+                </div>
+              )}
             </div>
 
             <div className="generation-info">
@@ -845,6 +915,14 @@ function GeneratePageV3() {
             </div>
           </div>
         )}
+
+        {/* Photo Upload Modal */}
+        <PhotoUploadModal
+          isOpen={showPhotoUploadModal}
+          onClose={() => setShowPhotoUploadModal(false)}
+          onPromptGenerated={handlePromptGenerated}
+          agentType={project?.tag === 'dating' ? 'dating' : 'general'}
+        />
 
         {/* Comment Modal */}
         {showCommentModal && (

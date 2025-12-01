@@ -199,6 +199,57 @@ export const generationAPI = {
 };
 
 // ==========================================
+// VISION API (Photo Upload & AI Analysis)
+// ==========================================
+
+export const visionAPI = {
+  /**
+   * Analyze uploaded photos and generate a prompt
+   * @param {string[]} imageUrls - Array of image URLs (1-20)
+   * @param {string} userInstructions - Optional user instructions
+   * @param {string} agentType - 'dating' or 'general'
+   */
+  analyzePhotos: async (imageUrls, userInstructions = '', agentType = 'general') => {
+    return request('/vision/analyze', {
+      method: 'POST',
+      body: JSON.stringify({
+        imageUrls,
+        userInstructions,
+        agentType
+      })
+    });
+  },
+  
+  /**
+   * Get a quick description of a single photo
+   * @param {string} imageUrl - Image URL
+   * @param {string} detailLevel - 'low', 'medium', or 'high'
+   */
+  describePhoto: async (imageUrl, detailLevel = 'medium') => {
+    return request('/vision/describe', {
+      method: 'POST',
+      body: JSON.stringify({
+        imageUrl,
+        detailLevel
+      })
+    });
+  },
+  
+  /**
+   * Batch analyze multiple photo sets
+   * @param {Array} photoSets - Array of photo set objects
+   */
+  batchAnalyze: async (photoSets) => {
+    return request('/vision/batch-analyze', {
+      method: 'POST',
+      body: JSON.stringify({
+        photoSets
+      })
+    });
+  }
+};
+
+// ==========================================
 // HEALTH CHECK
 // ==========================================
 
@@ -212,6 +263,7 @@ const apiV3Service = {
   projects: projectsAPI,
   sessions: sessionsAPI,
   generation: generationAPI,
+  vision: visionAPI,
   health: healthAPI
 };
 
