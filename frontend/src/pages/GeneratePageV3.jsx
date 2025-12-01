@@ -86,6 +86,17 @@ function GeneratePageV3() {
   const { projectId, sessionId } = useParams();
   const navigate = useNavigate();
 
+  const checkUnratedContent = useCallback(async () => {
+    try {
+      const response = await generationAPI.getUnrated(sessionId, 1);
+      if (response.success) {
+        setUnratedStats(response.stats);
+      }
+    } catch (err) {
+      console.error('Failed to check unrated:', err);
+    }
+  }, [sessionId]);
+
   const loadProjectAndSession = useCallback(async () => {
     try {
       const projectResponse = await projectsAPI.getById(projectId);
@@ -103,18 +114,7 @@ function GeneratePageV3() {
     } catch (err) {
       setError('Помилка завантаження: ' + err.message);
     }
-  }, [projectId, sessionId]);
-
-  const checkUnratedContent = useCallback(async () => {
-    try {
-      const response = await generationAPI.getUnrated(sessionId, 1);
-      if (response.success) {
-        setUnratedStats(response.stats);
-      }
-    } catch (err) {
-      console.error('Failed to check unrated:', err);
-    }
-  }, [sessionId]);
+  }, [projectId, sessionId, checkUnratedContent]);
 
   useEffect(() => {
     loadProjectAndSession();
