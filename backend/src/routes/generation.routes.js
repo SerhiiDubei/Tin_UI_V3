@@ -129,100 +129,116 @@ router.post('/generate', async (req, res) => {
     
     console.log('⚖️  Session has', Object.keys(parameters).length, 'parameter categories');
     
-    // Generate multiple items
-    const results = [];
+    // 🚀 PARALLEL GENERATION - Generate all items simultaneously
+    console.log(`\n🔥 Starting PARALLEL generation of ${count} items...`);
+    
+    // Create array of generation promises
+    const generationPromises = [];
     
     for (let i = 0; i < count; i++) {
-      console.log(`\n--- GENERATION ${i + 1}/${count} ---`);
-      
-      try {
-        // Step 1: Select parameters (weighted random)
-        const selectionResult = await selectParametersWeighted(sessionId, parameters);
-        
-        if (!selectionResult.success) {
-          throw new Error('Failed to select parameters: ' + selectionResult.error);
-        }
-        
-        const selectedParams = selectionResult.selected;
-        
-        console.log('✅ Parameters selected:', Object.keys(selectedParams).length);
-        
-        // Step 2: Build prompt with agent
-        const promptResult = await buildPromptFromParameters(
-          userPrompt,
-          selectedParams,
-          agentType,
-          category,
-          sessionId  // 🔥 Pass sessionId for comments loading
-        );
-        
-        if (!promptResult.success) {
-          throw new Error('Failed to build prompt: ' + promptResult.error);
-        }
-        
-        const enhancedPrompt = promptResult.prompt;
-        
-        // Step 3: Generate image
-        console.log('🎨 Generating image with', model);
-        
-        // All models now use Replicate (including nano-banana-pro)
-        const generationResult = await generateImageReplicate(
-          enhancedPrompt,
-          { modelKey: model },
-          userId
-        );
-        
-        if (!generationResult.success) {
-          throw new Error('Generation failed: ' + generationResult.error);
-        }
-        
-        // Step 4: Save to database
-        const weightsSnapshot = {
-          category: category,
-          parameters: Object.entries(selectedParams).map(([param, data]) => ({
-            parameter: param,
-            value: data.value,
-            weight: data.weight
-          }))
-        };
-        
-        const { data: content, error: contentError } = await supabase
-          .from('content_v3')
-          .insert([{
-            session_id: sessionId,
-            project_id: projectId,
-            user_id: userId,
-            url: generationResult.url,
-            type: 'image',
-            original_prompt: userPrompt,
-            enhanced_prompt: enhancedPrompt,
-            final_prompt: enhancedPrompt,
-            model: model,
-            agent_type: agentType,
-            weights_used: weightsSnapshot
-          }])
-          .select()
-          .single();
-        
-        if (contentError) throw contentError;
-        
-        console.log('✅ Content saved:', content.id);
-        
-        results.push({
-          success: true,
-          content,
-          url: generationResult.url,
-          parametersUsed: selectedParams
-        });
-        
-      } catch (error) {
-        console.error(`❌ Generation ${i + 1} failed:`, error);
-        results.push({
-          success: false,
-          error: error.message
-        });
-      }
+      generationPromises.push(
+        (async () => {
+          const itemNumber = i + 1;
+          console.log(`\n--- STARTING GENERATION ${itemNumber}/${count} ---`);
+          
+          try {
+            // Step 1: Select parameters (weighted random)
+            const selectionResult = await selectParametersWeighted(sessionId, parameters);
+            
+            if (!selectionResult.success) {
+              throw new Error('Failed to select parameters: ' + selectionResult.error);
+            }
+            
+            const selectedParams = selectionResult.selected;
+            
+            console.log(`✅ [${itemNumber}/${count}] Parameters selected:`, Object.keys(selectedParams).length);
+            
+            // Step 2: Build prompt with agent
+            const promptResult = await buildPromptFromParameters(
+              userPrompt,
+              selectedParams,
+              agentType,
+              category,
+              sessionId  // 🔥 Pass sessionId for comments loading
+            );
+            
+            if (!promptResult.success) {
+              throw new Error('Failed to build prompt: ' + promptResult.error);
+            }
+            
+            const enhancedPrompt = promptResult.prompt;
+            
+            // Step 3: Generate image
+            console.log(`🎨 [${itemNumber}/${count}] Generating image with`, model);
+            
+            // All models now use Replicate (including nano-banana-pro)
+            const generationResult = await generateImageReplicate(
+              enhancedPrompt,
+              { modelKey: model },
+              userId
+            );
+            
+            if (!generationResult.success) {
+              throw new Error('Generation failed: ' + generationResult.error);
+            }
+            
+            console.log(`✅ [${itemNumber}/${count}] Image generated successfully`);
+            
+            // Step 4: Save to database
+            const weightsSnapshot = {
+              category: category,
+              parameters: Object.entries(selectedParams).map(([param, data]) => ({
+                parameter: param,
+                value: data.value,
+                weight: data.weight
+              }))
+            };
+            
+            const { data: content, error: contentError } = await supabase
+              .from('content_v3')
+              .insert([{
+                session_id: sessionId,
+                project_id: projectId,
+                user_id: userId,
+                url: generationResult.url,
+                type: 'image',
+                original_prompt: userPrompt,
+                enhanced_prompt: enhancedPrompt,
+                final_prompt: enhancedPrompt,
+                model: model,
+                agent_type: agentType,
+                weights_used: weightsSnapshot
+              }])
+              .select()
+              .single();
+            
+            if (contentError) throw contentError;
+            
+            console.log(`✅ [${itemNumber}/${count}] Content saved:`, content.id);
+            
+            return {
+              success: true,
+              content,
+              url: generationResult.url,
+              parametersUsed: selectedParams,
+              itemNumber
+            };
+            
+          } catch (error) {
+            console.error(`❌ [${itemNumber}/${count}] Generation failed:`, error);
+            return {
+              success: false,
+              error: error.message,
+              itemNumber
+            };
+          }
+        })()
+      );
     }
+    
+    // Wait for all generations to complete in parallel
+    console.log(`⏳ Waiting for ${count} parallel generations to complete...`);
+    const results = await Promise.all(generationPromises);
     
     const successful = results.filter(r => r.success).length;
     const failed = results.filter(r => !r.success).length;

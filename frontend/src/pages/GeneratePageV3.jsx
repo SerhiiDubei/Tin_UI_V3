@@ -130,40 +130,47 @@ function GeneratePageV3() {
     setGenerationComplete(false);
 
     try {
-      // 🔥 STREAMING GENERATION: генеруємо по одному
-      for (let i = 0; i < count; i++) {
-        console.log(`🎨 Generating ${i + 1}/${count}...`);
-        
-        try {
-          const response = await generationAPI.generate({
-            sessionId: sessionId,
-            projectId: projectId,
-            userId: user.id,
-            userPrompt: prompt,
-            count: 1,              // 🔥 По одному!
-            model: selectedModel
-          });
+      // 🚀 PARALLEL GENERATION: одночасна генерація всіх зображень
+      console.log(`🔥 Starting PARALLEL generation of ${count} images...`);
+      
+      const response = await generationAPI.generate({
+        sessionId: sessionId,
+        projectId: projectId,
+        userId: user.id,
+        userPrompt: prompt,
+        count: count,              // 🔥 Всі одразу!
+        model: selectedModel
+      });
 
-          if (response.success && response.results && response.results[0]?.success) {
-            const newItem = response.results[0].content;
-            
-            // Додаємо нове фото одразу
-            setGeneratedItems(prev => [...prev, newItem]);
-            setProgress({ current: i + 1, total: count });
-            
-            // Якщо це перше фото - вимикаємо повний loader
-            if (i === 0) {
-              setGenerating(false);
-              setLoadingNext(true); // Наступні генеруються в фоні
-            }
-            
-            console.log(`✅ Generated ${i + 1}/${count}`);
-          } else {
-            console.error(`❌ Failed generation ${i + 1}`);
-          }
-        } catch (err) {
-          console.error(`Error generating ${i + 1}:`, err);
+      console.log('📦 Received generation response:', response);
+
+      if (response.success) {
+        // Фільтруємо тільки успішні результати
+        const successfulItems = response.results
+          .filter(r => r.success && r.content)
+          .map(r => r.content);
+        
+        console.log(`✅ Successfully generated ${successfulItems.length}/${count} images`);
+        
+        if (successfulItems.length > 0) {
+          setGeneratedItems(successfulItems);
+          setProgress({ current: successfulItems.length, total: count });
+          setGenerating(false);
+          setLoadingNext(false);
+          setGenerationComplete(true);
+          
+          console.log('🎉 All images ready for swiping!');
+        } else {
+          throw new Error('Не вдалося згенерувати жодного зображення');
         }
+        
+        // Якщо були помилки - показуємо
+        const failedCount = response.results.filter(r => !r.success).length;
+        if (failedCount > 0) {
+          console.warn(`⚠️ ${failedCount} generations failed`);
+        }
+      } else {
+        throw new Error(response.error || 'Невідома помилка генерації');
       }
       
       // Всі згенеровані
@@ -585,7 +592,7 @@ function GeneratePageV3() {
               <div className="info-item">
                 <span className="info-icon">⚡</span>
                 <div>
-                  <strong>Режим:</strong> Step-by-step (свайп одразу після генерації)
+                  <strong>Режим:</strong> 🚀 Паралельна генерація (всі одразу)
                 </div>
               </div>
             </div>
@@ -612,7 +619,7 @@ function GeneratePageV3() {
               />
             </div>
             <p className="progress-hint">
-              Зображення з'являться одразу після генерації. Ви зможете свайпати кожне окремо.
+              🚀 Паралельна генерація: всі {progress.total} зображень генеруються одночасно. Зачекайте завершення...
             </p>
           </Card>
         )}
