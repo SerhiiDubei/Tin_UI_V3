@@ -188,6 +188,13 @@ export const generationAPI = {
    */
   getGallery: async (sessionId, filter = 'all') => {
     return request(`/generation/gallery?sessionId=${sessionId}&filter=${filter}`);
+  },
+
+  /**
+   * Get unrated content for session (for resuming swiping)
+   */
+  getUnrated: async (sessionId, limit = 50) => {
+    return request(`/generation/unrated?sessionId=${sessionId}&limit=${limit}`);
   }
 };
 

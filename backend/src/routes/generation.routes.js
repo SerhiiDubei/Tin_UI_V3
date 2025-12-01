@@ -387,4 +387,73 @@ router.get('/gallery', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/generation/unrated
+ * Get all unrated content for a session (for resuming swiping)
+ * 
+ * Query params:
+ *   sessionId: string (required)
+ *   limit?: number (optional, default 50)
+ */
+router.get('/unrated', async (req, res) => {
+  try {
+    const { sessionId, limit = 50 } = req.query;
+    
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        error: 'sessionId is required'
+      });
+    }
+    
+    console.log('\n📋 FETCHING UNRATED CONTENT');
+    console.log('Session ID:', sessionId);
+    console.log('Limit:', limit);
+    
+    // Get all unrated content (rating is null)
+    const { data: unratedContent, error } = await supabase
+      .from('content_v3')
+      .select('*')
+      .eq('session_id', sessionId)
+      .is('rating', null)
+      .order('created_at', { ascending: true })  // Oldest first
+      .limit(parseInt(limit));
+    
+    if (error) throw error;
+    
+    // Get total stats for session
+    const { data: allContent, error: statsError } = await supabase
+      .from('content_v3')
+      .select('id, rating')
+      .eq('session_id', sessionId);
+    
+    if (statsError) throw statsError;
+    
+    const rated = allContent.filter(c => c.rating !== null);
+    
+    console.log('✅ Found unrated content:', unratedContent.length);
+    console.log('   Total content:', allContent.length);
+    console.log('   Rated:', rated.length);
+    console.log('   Unrated:', allContent.length - rated.length);
+    
+    res.json({
+      success: true,
+      data: unratedContent,
+      stats: {
+        total: allContent.length,
+        rated: rated.length,
+        unrated: allContent.length - rated.length,
+        hasUnrated: unratedContent.length > 0
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Unrated fetch error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 export default router;

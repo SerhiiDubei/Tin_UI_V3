@@ -69,6 +69,8 @@ function GeneratePageV3() {
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
   const [loadingNext, setLoadingNext] = useState(false);
   const [generationComplete, setGenerationComplete] = useState(false);
+  const [unratedStats, setUnratedStats] = useState(null);
+  const [loadingUnrated, setLoadingUnrated] = useState(false);
   
   // Swipe state
   const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
@@ -90,10 +92,24 @@ function GeneratePageV3() {
       if (sessionResponse.success) {
         setSession(sessionResponse.data);
       }
+      
+      // 🔥 Check for unrated content
+      await checkUnratedContent();
     } catch (err) {
       setError('Помилка завантаження: ' + err.message);
     }
   }, [projectId, sessionId]);
+
+  const checkUnratedContent = useCallback(async () => {
+    try {
+      const response = await generationAPI.getUnrated(sessionId, 1);
+      if (response.success) {
+        setUnratedStats(response.stats);
+      }
+    } catch (err) {
+      console.error('Failed to check unrated:', err);
+    }
+  }, [sessionId]);
 
   useEffect(() => {
     loadProjectAndSession();
@@ -257,6 +273,35 @@ function GeneratePageV3() {
     navigate(`/projects/${projectId}/sessions/${sessionId}/gallery`);
   };
 
+  const handleResumeRating = async () => {
+    setLoadingUnrated(true);
+    try {
+      console.log('📋 Loading unrated content for session:', sessionId);
+      
+      const response = await generationAPI.getUnrated(sessionId, 50);
+      
+      if (response.success && response.data.length > 0) {
+        console.log(`✅ Found ${response.data.length} unrated items`);
+        
+        // Завантажуємо неоцінені фото
+        setGeneratedItems(response.data);
+        setCurrentIndex(0);
+        setGenerating(false);
+        setLoadingNext(false);
+        setGenerationComplete(false);
+        setShowCompletionScreen(false);
+        setUnratedStats(null); // Hide the button
+      } else {
+        alert('Немає неоцінених фото для продовження');
+      }
+    } catch (err) {
+      console.error('❌ Failed to load unrated:', err);
+      setError('Не вдалося завантажити неоцінені фото: ' + err.message);
+    } finally {
+      setLoadingUnrated(false);
+    }
+  };
+
   // Touch handlers for swipe
   const handleTouchStart = (e) => {
     setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
@@ -397,6 +442,43 @@ function GeneratePageV3() {
           <div className="error-banner">
             ❌ {error}
           </div>
+        )}
+
+        {/* Resume Rating Banner */}
+        {!generating && generatedItems.length === 0 && unratedStats && unratedStats.unrated > 0 && (
+          <Card className="resume-rating-card" style={{ 
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            marginBottom: '2rem',
+            padding: '1.5rem',
+            borderRadius: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h3 style={{ margin: 0, marginBottom: '0.5rem', fontSize: '1.2rem' }}>
+                  📋 Є неоцінені фото!
+                </h3>
+                <p style={{ margin: 0, opacity: 0.9 }}>
+                  У вас залишилось <strong>{unratedStats.unrated}</strong> неоцінених фото з попередньої сесії.
+                  Продовжіть оцінювання щоб покращити навчання AI.
+                </p>
+              </div>
+              <Button
+                variant="primary"
+                size="large"
+                onClick={handleResumeRating}
+                disabled={loadingUnrated}
+                style={{ 
+                  background: 'white',
+                  color: '#667eea',
+                  fontWeight: 'bold',
+                  minWidth: '200px'
+                }}
+              >
+                {loadingUnrated ? '⏳ Завантаження...' : '▶️ Продовжити оцінювання'}
+              </Button>
+            </div>
+          </Card>
         )}
 
         {/* Prompt Input Section */}
