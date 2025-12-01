@@ -9,25 +9,39 @@ const openai = new OpenAI({
  * Analyze uploaded photos using GPT-4o Vision API
  * Generate a detailed prompt for content generation based on the photos
  * 
- * @param {Array<string>} imageUrls - Array of image URLs (up to 20)
+ * @param {Array<Object>} photosData - Array of {url, comment, index} objects
  * @param {string} userInstructions - Optional user instructions/context
  * @param {string} agentType - 'dating' or 'general'
  * @returns {Object} { success, prompt, analysis, error }
  */
-export async function analyzePhotosAndGeneratePrompt(imageUrls, userInstructions = '', agentType = 'general') {
+export async function analyzePhotosAndGeneratePrompt(photosData, userInstructions = '', agentType = 'general') {
   try {
+    // Support both old format (array of strings) and new format (array of objects)
+    const photos = Array.isArray(photosData) && typeof photosData[0] === 'string'
+      ? photosData.map((url, i) => ({ url, comment: '', index: i + 1 }))
+      : photosData;
+    
     console.log('\n' + '='.repeat(80));
     console.log('👁️  VISION API - ANALYZING PHOTOS');
     console.log('='.repeat(80));
-    console.log('Photos count:', imageUrls.length);
+    console.log('Photos count:', photos.length);
     console.log('Agent type:', agentType);
     console.log('User instructions:', userInstructions || 'None');
     
-    if (!imageUrls || imageUrls.length === 0) {
+    // Log photo comments
+    const photosWithComments = photos.filter(p => p.comment);
+    if (photosWithComments.length > 0) {
+      console.log('📝 Photos with comments:');
+      photosWithComments.forEach(p => {
+        console.log(`   Photo ${p.index}: ${p.comment}`);
+      });
+    }
+    
+    if (!photos || photos.length === 0) {
       throw new Error('No images provided');
     }
     
-    if (imageUrls.length > 20) {
+    if (photos.length > 20) {
       throw new Error('Maximum 20 images allowed');
     }
     
@@ -36,21 +50,19 @@ export async function analyzePhotosAndGeneratePrompt(imageUrls, userInstructions
       ? getDatingVisionPrompt()
       : getGeneralVisionPrompt();
     
-    // Build user message with images
+    // Build user message with images and comments
     const userMessage = {
       role: 'user',
       content: [
         {
           type: 'text',
-          text: userInstructions 
-            ? `Analyze these photos and generate a detailed prompt based on them. User instructions: ${userInstructions}`
-            : 'Analyze these photos and generate a detailed, comprehensive prompt for AI content generation that captures the style, mood, composition, and key visual elements.'
+          text: buildAnalysisRequest(userInstructions, agentType, photos)
         },
-        // Add all images
-        ...imageUrls.map(url => ({
+        // Add all images with their metadata
+        ...photos.map(photo => ({
           type: 'image_url',
           image_url: {
-            url: url,
+            url: photo.url,
             detail: 'high' // Use high detail for better analysis
           }
         }))
@@ -97,7 +109,7 @@ export async function analyzePhotosAndGeneratePrompt(imageUrls, userInstructions
       success: true,
       prompt: prompt,
       analysis: analysis,
-      imageCount: imageUrls.length,
+      imageCount: photos.length,
       model: 'gpt-4o',
       agentType: agentType
     };
@@ -112,175 +124,180 @@ export async function analyzePhotosAndGeneratePrompt(imageUrls, userInstructions
 }
 
 /**
- * Dating-specific vision prompt
+ * Build analysis request text with safety context and photo comments
  */
-function getDatingVisionPrompt() {
-  return `You are an expert AI image analyst specializing in dating profile photography.
+function buildAnalysisRequest(userInstructions, agentType, photos) {
+  const context = agentType === 'dating' 
+    ? 'These are public marketing/promotional photos for analysis purposes.'
+    : 'These are business/marketing images provided for professional analysis.';
+  
+  // Build photo comments section
+  let photoComments = '';
+  const photosWithComments = photos.filter(p => p.comment);
+  if (photosWithComments.length > 0) {
+    photoComments = '\n\n📝 USER NOTES FOR EACH PHOTO:\n';
+    photosWithComments.forEach(p => {
+      photoComments += `Photo ${p.index}: ${p.comment}\n`;
+    });
+  }
+  
+  const task = userInstructions 
+    ? `Analyze the COMMON visual style across all images and generate ONE prompt for creating a SINGLE image in this style. User context: ${userInstructions}`
+    : 'Find the COMMON VISUAL STYLE across all images (lighting, composition, color palette, mood, quality) and generate ONE prompt for creating a SINGLE NEW image in this unified style.';
+  
+  return `${context}${photoComments}
 
-🎯 YOUR TASK:
-Analyze the provided photos and generate a detailed prompt for creating similar smartphone dating photos using Seedream 4.0.
+**CRITICAL INSTRUCTIONS:**
+1. You are analyzing ${photos.length} SEPARATE reference images
+2. DO NOT describe each image individually
+3. DO NOT create a "collage" or "series" description
+4. FIND the COMMON visual style that connects all images:
+   - Common lighting approach
+   - Common color palette
+   - Common composition style
+   - Common mood/atmosphere
+   - Common technical quality
+5. Generate ONE prompt for creating a SINGLE NEW image in this style
 
-📋 ANALYSIS FRAMEWORK - Extract these elements:
+**EXAMPLE:**
+BAD: "Series featuring business professional, family with flag, vehicle, and Mount Rushmore" ❌
+GOOD: "Professional insurance advertising photography with warm natural lighting, patriotic American aesthetic, diverse subjects in authentic settings, red/blue/white color scheme, high-quality editorial style" ✅
 
-1. **SUBJECT & APPEARANCE**
-   - Age range (22-25, 26-30, 31-35)
-   - Gender and style
-   - Clothing style (casual, confident, mature, athletic, professional)
-   - Physical features and expression
+Task: ${task}
 
-2. **SMARTPHONE AUTHENTICITY**
-   - Device simulation (iPhone 13/14, Pixel 7, Samsung S21)
-   - Filename style (IMG_####.HEIC, DSC_####.JPG)
-   - Photo quality indicators (slight blur, grain, compression)
-   - Authentic imperfections (off-center, casual mistakes)
-
-3. **COMPOSITION & FRAMING**
-   - Shot distance (selfie, portrait, full-body, environmental)
-   - Camera angle (eye-level, slightly above, low angle)
-   - Subject position (centered, rule-of-thirds, off-center)
-   - Cropping style
-
-4. **BACKGROUND & SETTING**
-   - Location type (urban, nature, indoor, café, gym, beach, etc.)
-   - Background complexity (plain, blurred, detailed, busy)
-   - Depth and bokeh
-   - Environmental context
-
-5. **LIGHTING & ATMOSPHERE**
-   - Light source (natural daylight, golden hour, indoor, window light, artificial)
-   - Direction (front, side, backlight)
-   - Quality (soft, harsh, mixed)
-   - Shadows and highlights
-
-6. **COLOR & MOOD**
-   - Color palette (warm, cool, neutral, vibrant, muted)
-   - Saturation level
-   - Contrast
-   - Overall mood (casual, confident, romantic, energetic, relaxed)
-
-7. **MOTION & DYNAMICS**
-   - Subject state (static, walking, laughing, candid action)
-   - Movement blur
-   - Energy level
-
-8. **DEPTH & FOCUS**
-   - Focus type (sharp subject, slight background blur, bokeh, everything sharp)
-   - Depth of field simulation
-
-9. **TEXTURE & DETAIL**
-   - Skin texture (natural, slightly smooth)
-   - Fabric detail
-   - Material rendering
-   - Fine details vs. smartphone limitations
-
-10. **TIME & WEATHER**
-    - Time of day
-    - Season indicators
-    - Weather conditions
-    - Atmospheric effects
-
-11. **IMPERFECTIONS (KEY!)**
-    - 1-3 authentic flaws that make it look real:
-      * Slight off-center framing
-      * Tiny bit of motion blur
-      * Subtle compression artifacts
-      * Casual angle
-      * Background not perfectly clean
-      * Natural lighting inconsistencies
-
-📤 OUTPUT FORMAT:
-Generate a comprehensive prompt that combines all these elements in natural language.
-Focus on authenticity - real dating photos have imperfections!
-
-Example output structure:
-"Smartphone selfie of [subject description], [clothing], taken with [device], [composition details], [background], [lighting], [mood], [imperfections]. Filename: IMG_####.HEIC. Natural smartphone photography feel with [specific authentic touches]."
-
-🔑 REMEMBER:
-- Perfect = Fake. Casual imperfections = Authentic.
-- Think like someone taking a quick photo for their dating profile
-- Capture the spontaneous, real-person feel
-- Include 1-3 subtle imperfections that make it believable`;
+**OUTPUT FORMAT:** One cohesive prompt describing the SHARED VISUAL STYLE (not listing individual scenes).`;
 }
 
 /**
- * General vision prompt
+ * Dating-specific vision prompt
+ */
+function getDatingVisionPrompt() {
+  return `You are a professional visual content analyst specializing in marketing photography.
+
+**IMPORTANT CONTEXT:**
+You are analyzing public marketing/promotional photographs for professional business purposes. These images are provided for style analysis and creative prompt generation only.
+
+**YOUR TASK:**
+You will see multiple REFERENCE images. Find their COMMON VISUAL STYLE and generate a prompt for creating ONE NEW image in this style.
+
+**⚠️ CRITICAL - DO NOT:**
+- Describe each image separately
+- List all subjects/scenes ("business professional, family, vehicle...")
+- Create a "series" or "collage" description
+- Mention "featuring X and Y and Z"
+
+**✅ INSTEAD - FOCUS ON:**
+
+1. **Common Photography Style**
+   - Professional editorial? Casual smartphone? Documentary?
+   - Consistent camera angles/perspectives across images
+
+2. **Shared Lighting Approach**
+   - Natural daylight? Studio? Mixed lighting?
+   - Consistent light quality (soft, hard, warm, cool)
+
+3. **Unified Color Palette**
+   - Dominant colors appearing across images
+   - Color temperature consistency
+   - Saturation/contrast patterns
+
+4. **Consistent Mood & Tone**
+   - Professional? Authentic? Aspirational? Patriotic?
+   - Energy level across images
+
+5. **Common Technical Quality**
+   - Image sharpness/clarity
+   - Depth of field approach
+   - Professional vs. casual quality
+
+6. **Shared Composition Patterns**
+   - Subject placement (centered, rule of thirds, etc.)
+   - Background treatment
+   - Framing approach
+
+**OUTPUT FORMAT:**
+"[Photography style] with [lighting description], [color palette], [mood/atmosphere], [composition approach], [technical quality]. [Additional style notes about authenticity, setting preferences, or brand aesthetic]."
+
+**GOOD EXAMPLES:**
+✅ "Professional insurance advertising photography with warm natural daylight, patriotic red/blue/white color scheme, diverse authentic subjects, clean editorial composition, high production value"
+✅ "Casual smartphone photography style with soft window lighting, muted earthy tones, candid moments, slightly off-center framing, authentic feel with minor imperfections"
+
+**BAD EXAMPLES:**
+❌ "Series featuring business professional at desk, family with flag, vehicle, and Mount Rushmore"
+❌ "Collage of multiple scenes including office, outdoor, and landmark settings"`;
+}
+
+/**
+ * General vision prompt - UNIVERSAL for all business content
  */
 function getGeneralVisionPrompt() {
-  return `You are an expert AI image analyst and prompt engineer.
+  return `You are a professional visual content analyst specializing in marketing and business photography.
 
-🎯 YOUR TASK:
-Analyze the provided photos and generate a detailed, comprehensive prompt for AI content generation that accurately captures the visual style, composition, and key elements.
+**IMPORTANT CONTEXT:**
+You are analyzing business/marketing images for professional purposes. These may include:
+- Insurance/financial marketing materials
+- Automotive advertisements
+- Product photography
+- Corporate communications
+- Marketing campaigns
+- Promotional content
 
-📋 ANALYSIS FRAMEWORK:
+All images are provided for legitimate business analysis and creative prompt generation.
 
-1. **SUBJECT & CONTENT**
-   - Main subject(s) and objects
-   - Actions and activities
-   - Key visual elements
-   - Story or narrative
+**YOUR TASK:**
+Analyze MULTIPLE business/marketing reference images and identify their COMMON VISUAL STYLE. Generate a prompt for creating ONE NEW image in this unified style.
 
-2. **STYLE & AESTHETICS**
-   - Art style (photorealistic, illustration, digital art, painting, etc.)
-   - Visual treatment (cinematic, editorial, documentary, artistic)
-   - Artistic influences or references
+**⚠️ CRITICAL - AVOID "COLLAGE" DESCRIPTIONS:**
+- DO NOT list all subjects from different images
+- DO NOT describe a "series" or "collection"
+- DO NOT say "featuring X, Y, and Z from different scenes"
 
-3. **COMPOSITION**
-   - Framing and perspective
-   - Rule of thirds, symmetry, or other composition techniques
-   - Subject placement
-   - Negative space
+**✅ FOCUS ON SHARED CHARACTERISTICS:**
 
-4. **LIGHTING**
-   - Light source and direction
-   - Quality (soft, hard, diffused, dramatic)
-   - Time of day feel
-   - Shadow and highlight treatment
+1. **Common Marketing Style**
+   - Professional editorial? Authentic lifestyle? Corporate?
+   - Consistent brand aesthetic across images
 
-5. **COLOR**
-   - Color palette and harmony
-   - Saturation and vibrancy
-   - Contrast levels
-   - Color grading or toning
+2. **Unified Color Strategy**
+   - Brand colors appearing consistently
+   - Color palette (warm/cool/vibrant/muted)
+   - Color grading approach
 
-6. **TECHNICAL DETAILS**
-   - Camera/lens simulation (if applicable)
-   - Depth of field
-   - Focus points
-   - Technical effects
+3. **Consistent Lighting Approach**
+   - Natural vs. studio lighting
+   - Light quality and direction
+   - Professional lighting setup patterns
 
-7. **MOOD & ATMOSPHERE**
-   - Emotional tone
-   - Atmosphere and feeling
-   - Energy level
+4. **Shared Composition Style**
+   - Subject placement patterns
+   - Framing consistency
+   - Background treatment approach
 
-8. **BACKGROUND & SETTING**
-   - Environment type
-   - Level of detail
-   - Context and location
+5. **Common Mood & Message**
+   - Professional tone
+   - Emotional appeal
+   - Brand message consistency
 
-9. **TEXTURE & DETAIL**
-   - Surface qualities
-   - Material rendering
-   - Level of detail vs. abstraction
+6. **Technical Quality Standards**
+   - Professional production value
+   - Image clarity and quality
+   - Technical execution level
 
-10. **SPECIAL EFFECTS**
-    - Motion blur, bokeh, lens flares
-    - Weather effects
-    - Atmospheric elements
+7. **Consistent Design Elements**
+   - Text overlay style (if present)
+   - Graphic treatment
+   - Brand presentation patterns
 
-📤 OUTPUT FORMAT:
-Generate a detailed, flowing prompt that combines all these elements naturally.
-Be specific and descriptive, capturing both the technical and artistic aspects.
+**OUTPUT FORMAT:**
+"[Marketing style] photography with [lighting approach], [color palette], [mood/message], [composition style], [professional quality]. [Brand aesthetic notes]."
 
-Example structure:
-"[Style description] of [subject], [composition details], [lighting description], [color treatment], [mood], [background/setting], [technical details], [special notes about texture, effects, or unique characteristics]."
+**GOOD EXAMPLES:**
+✅ "Professional insurance advertising photography with warm natural lighting, patriotic American aesthetic, clean editorial composition, red/white/blue color emphasis, high production value, trustworthy professional tone"
+✅ "Authentic lifestyle marketing photography with soft diffused lighting, earthy natural tones, candid moments, diverse subjects, approachable feel"
 
-🔑 KEY PRINCIPLES:
-- Be specific and detailed
-- Use natural, flowing language
-- Include both what to show and how to show it
-- Capture the unique character and style of the images
-- Think about what makes these images distinctive`;
+**BAD EXAMPLES:**
+❌ "Marketing collage featuring office professional, family outdoors, vehicle, landmark, and text overlays"
+❌ "Series of images showing business woman, family with flag, car, and Mount Rushmore"`;
 }
 
 /**

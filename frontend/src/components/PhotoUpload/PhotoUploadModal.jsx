@@ -32,9 +32,9 @@ const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'gen
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       
-      // Check file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        setError(`File ${file.name} is too large (max 10MB)`);
+      // Check file size (max 15MB)
+      if (file.size > 15 * 1024 * 1024) {
+        setError(`File ${file.name} is too large (max 15MB)`);
         continue;
       }
 
@@ -51,7 +51,8 @@ const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'gen
           file: file,
           preview: base64,
           dataUrl: base64,
-          name: file.name
+          name: file.name,
+          comment: '' // Коментар користувача для кожного фото
         });
         setProgress(prev => ({ ...prev, current: prev.current + 1 }));
       } catch (err) {
@@ -66,15 +67,63 @@ const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'gen
 
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (error) => reject(error);
+      // Компресуємо велике зображення
+      if (file.size > 2 * 1024 * 1024) { // Якщо більше 2MB
+        const img = new Image();
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            // Зменшуємо до max 1920px
+            const maxSize = 1920;
+            if (width > maxSize || height > maxSize) {
+              if (width > height) {
+                height = (height / width) * maxSize;
+                width = maxSize;
+              } else {
+                width = (width / height) * maxSize;
+                height = maxSize;
+              }
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Compress to JPEG 85% quality
+            const compressed = canvas.toDataURL('image/jpeg', 0.85);
+            console.log(`✅ Compressed ${file.name}: ${Math.round(file.size/1024)}KB → ${Math.round(compressed.length*0.75/1024)}KB`);
+            resolve(compressed);
+          };
+          img.src = e.target.result;
+        };
+        
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(file);
+      } else {
+        // Малі файли не компресуємо
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = (error) => reject(error);
+      }
     });
   };
 
   const removePhoto = (id) => {
     setPhotos(prev => prev.filter(p => p.id !== id));
+  };
+
+  const updatePhotoComment = (id, comment) => {
+    setPhotos(prev => prev.map(p => 
+      p.id === id ? { ...p, comment } : p
+    ));
   };
 
   const handleAnalyze = async () => {
@@ -90,13 +139,18 @@ const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'gen
       // Import API service
       const { visionAPI } = await import('../../services/api-v3.js');
       
-      // Extract data URLs
-      const imageUrls = photos.map(p => p.dataUrl);
+      // Build photos array with comments
+      const photosData = photos.map((p, index) => ({
+        url: p.dataUrl,
+        comment: p.comment || '',
+        index: index + 1
+      }));
 
       console.log('🔍 Analyzing', photos.length, 'photos...');
+      console.log('📝 Photo comments:', photosData.map(p => `${p.index}: ${p.comment || 'none'}`));
       
       const response = await visionAPI.analyzePhotos(
-        imageUrls,
+        photosData,
         userInstructions,
         agentType
       );
@@ -164,7 +218,7 @@ const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'gen
                 Click to upload photos
                 <br />
                 <span className="upload-hint">
-                  {photos.length}/20 photos · Max 10MB per file
+                  {photos.length}/20 photos · Max 15MB per file
                 </span>
               </div>
             </label>
@@ -186,8 +240,9 @@ const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'gen
           {/* Photos Grid */}
           {photos.length > 0 && (
             <div className="photos-grid">
-              {photos.map((photo) => (
+              {photos.map((photo, index) => (
                 <div key={photo.id} className="photo-item">
+                  <div className="photo-number">#{index + 1}</div>
                   <img src={photo.preview} alt={photo.name} />
                   <button
                     className="remove-photo-btn"
@@ -197,6 +252,14 @@ const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'gen
                     ✕
                   </button>
                   <div className="photo-name">{photo.name}</div>
+                  <input
+                    type="text"
+                    className="photo-comment-input"
+                    placeholder="💬 Коментар (компанія, фон, побажання...)"
+                    value={photo.comment}
+                    onChange={(e) => updatePhotoComment(photo.id, e.target.value)}
+                    disabled={analyzing}
+                  />
                 </div>
               ))}
             </div>

@@ -496,6 +496,17 @@ async function loadSessionQAHistory(sessionId) {
       .order('created_at', { ascending: false })
       .limit(20); // Last 20 QA validations
     
+    // If column doesn't exist, return empty history (backward compatibility)
+    if (error && error.code === '42703') {
+      console.log('⚠️  qa_validation column does not exist yet (run ADD_QA_COLUMN.sql)');
+      return {
+        success: true,
+        history: [],
+        commonIssues: [],
+        avgScore: null
+      };
+    }
+    
     if (error) throw error;
     
     if (!contents || contents.length === 0) {

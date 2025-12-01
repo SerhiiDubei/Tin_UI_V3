@@ -44,6 +44,11 @@ export async function generateContent(prompt, contentType, modelKey, customParam
 
     console.log('Generation output:', output);
 
+    // Check if output is valid
+    if (!output || (Array.isArray(output) && output.length === 0)) {
+      throw new Error('No image content found in response (Replicate returned null/empty)');
+    }
+
     // Extract temporary URL from output
     let temporaryUrl;
     if (Array.isArray(output)) {
@@ -54,6 +59,11 @@ export async function generateContent(prompt, contentType, modelKey, customParam
       temporaryUrl = output.url;
     } else {
       temporaryUrl = output;
+    }
+    
+    // Validate URL
+    if (!temporaryUrl || typeof temporaryUrl !== 'string') {
+      throw new Error(`Invalid URL from Replicate: ${temporaryUrl}`);
     }
 
     console.log(`📥 Temporary URL from Replicate: ${temporaryUrl}`);

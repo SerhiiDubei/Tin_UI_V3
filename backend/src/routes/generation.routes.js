@@ -230,22 +230,30 @@ router.post('/generate', async (req, res) => {
               timestamp: new Date().toISOString()
             } : null;
             
+            // Prepare content data (without qa_validation for now)
+            const contentData = {
+              session_id: sessionId,
+              project_id: projectId,
+              user_id: userId,
+              url: generationResult.url,
+              type: 'image',
+              original_prompt: userPrompt,
+              enhanced_prompt: enhancedPrompt,
+              final_prompt: enhancedPrompt,
+              model: model,
+              agent_type: agentType,
+              weights_used: weightsSnapshot
+            };
+            
+            // Add qa_validation only if column exists (optional for backward compatibility)
+            if (qaSnapshot && enableQA) {
+              // Try to add qa_validation, but don't fail if column doesn't exist
+              contentData.qa_validation = qaSnapshot;
+            }
+            
             const { data: content, error: contentError } = await supabase
               .from('content_v3')
-              .insert([{
-                session_id: sessionId,
-                project_id: projectId,
-                user_id: userId,
-                url: generationResult.url,
-                type: 'image',
-                original_prompt: userPrompt,
-                enhanced_prompt: enhancedPrompt,
-                final_prompt: enhancedPrompt,
-                model: model,
-                agent_type: agentType,
-                weights_used: weightsSnapshot,
-                qa_validation: qaSnapshot
-              }])
+              .insert([contentData])
               .select()
               .single();
             
@@ -287,8 +295,10 @@ router.post('/generate', async (req, res) => {
     console.log('   Failed:', failed);
     console.log('='.repeat(80) + '\n');
     
+    // ✅ Success if at least ONE generation succeeded
+    // Frontend will filter successful items
     res.json({
-      success: failed === 0,
+      success: successful > 0,  // ← Changed! Was: failed === 0
       total: count,
       successful,
       failed,

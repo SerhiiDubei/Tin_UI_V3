@@ -11,8 +11,9 @@ Modern full-stack application that generates AI content (images, videos, audio) 
 ### 🎨 Content Generation
 - **Multi-modal AI**: Generate images, videos, and audio
 - **Smart Prompts**: AI-enhanced prompts using GPT-4o
-- **Multiple Models**: Seedream 4, Replicate models, and more
-- **Real-time Generation**: Step-by-step content creation
+- **Vision AI**: 📸 Upload 1-20 photos → AI analyzes style → generates prompt
+- **Multiple Models**: Seedream 4, Nano Banana Pro, and more
+- **Streaming Generation**: Photos appear progressively as they generate
 
 ### 👆 Swipe Feedback
 - **Tinder-style Interface**: Swipe left (dislike), right (like), up (superlike), down (skip)
@@ -44,9 +45,9 @@ Modern full-stack application that generates AI content (images, videos, audio) 
 ### Backend
 - **Node.js + Express** - REST API server
 - **Supabase (PostgreSQL)** - Database and storage
-- **OpenAI GPT-4o** - Prompt enhancement
-- **Replicate API** - AI model integration
-- **Seedream API** - Image/video generation
+- **OpenAI GPT-4o** - Prompt enhancement + Vision AI
+- **Replicate API** - AI model integration (Nano Banana Pro)
+- **Seedream API** - Image generation (Seedream 4)
 
 ### Infrastructure
 - **Supabase** - Database, Storage, Auth
@@ -189,11 +190,24 @@ Tin_UI_V3/
 4. AI generates initial parameters automatically
 
 ### Generating Content
+
+**Option 1: Text Prompt**
 1. Open a session
-2. Enter your prompt (e.g., "Beautiful sunset over ocean")
+2. Enter your prompt (e.g., "Professional insurance advertising")
 3. Click "🚀 Згенерувати та почати свайпати"
-4. Wait for generation (10 images by default)
-5. Start swiping!
+4. Photos appear progressively as they generate
+5. Start swiping immediately after first photo!
+
+**Option 2: 🆕 Vision AI (Upload Photos)**
+1. Click "📸 Upload Photos" button
+2. Select 1-20 reference photos
+3. Add optional comments to each photo:
+   - "Geico Insurance, suburban setting"
+   - "Focus on warm natural lighting"
+4. Add global instructions (optional)
+5. Click "🔍 Analyze"
+6. AI generates unified prompt based on common style
+7. Use prompt to generate new photos! ✨
 
 ### Swiping Content
 - **Swipe Left** / **←**: Dislike
@@ -211,17 +225,27 @@ Tin_UI_V3/
 
 ## 🔑 API Keys Setup
 
-### OpenAI (Required for prompt enhancement)
+### OpenAI (Required)
+**Used for:** Prompt enhancement + Vision AI photo analysis
+
 1. Go to https://platform.openai.com/api-keys
 2. Create new API key
 3. Add to `backend/.env` as `OPENAI_API_KEY`
 
+**Models used:**
+- GPT-4o (prompt enhancement)
+- GPT-4o Vision (photo analysis)
+
 ### Replicate (Optional)
+**Used for:** Nano Banana Pro model
+
 1. Go to https://replicate.com/account/api-tokens
 2. Create token
 3. Add to `backend/.env` as `REPLICATE_API_TOKEN`
 
-### Seedream (Optional)
+### Seedream (Recommended)
+**Used for:** Seedream 4 model (most stable)
+
 1. Contact Seedream for API access
 2. Add key to `backend/.env` as `SEEDREAM_API_KEY`
 
@@ -248,6 +272,18 @@ Tin_UI_V3/
 - Verify API keys in `.env`
 - Check backend logs for errors
 - Ensure you have API credits
+- Try Seedream 4 instead of Nano Banana Pro
+
+### Photo upload fails ("request entity too large")
+- ✅ **FIXED**: Auto-compression enabled
+- Large photos (>2MB) automatically compressed
+- Max upload: 50MB total, 15MB per photo
+- Support up to 20 photos
+
+### Vision AI fails ("I'm sorry, but I can't assist")
+- ✅ **FIXED**: Safety disclaimers added
+- Works for: Insurance, Automotive, Dating, Products, Corporate
+- Add context in comments for better results
 
 ---
 

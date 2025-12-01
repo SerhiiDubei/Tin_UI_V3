@@ -58,9 +58,10 @@ function GeneratePageV3() {
   const [session, setSession] = useState(null);
   const [prompt, setPrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState('seedream-4');
-  const [count, setCount] = useState(10);
+  const [count, setCount] = useState(10); // За замовчуванням 10
   const [enableQA, setEnableQA] = useState(true); // QA включено за замовчуванням
   const [generating, setGenerating] = useState(false);
+  const [failedGenerations, setFailedGenerations] = useState([]); // Список failed генерацій
   const [generatedItems, setGeneratedItems] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
@@ -136,53 +137,122 @@ function GeneratePageV3() {
     setGenerationComplete(false);
 
     try {
-      // 🚀 PARALLEL GENERATION: одночасна генерація всіх зображень
-      console.log(`🔥 Starting PARALLEL generation of ${count} images...`);
+      // 🚀 STREAMING GENERATION: Запити з інтервалом, фото з'являються ВІДРАЗУ
+      console.log(`🔥 Starting STREAMING generation of ${count} images with 2-3 sec interval...`);
       
-      const response = await generationAPI.generate({
-        sessionId: sessionId,
-        projectId: projectId,
-        userId: user.id,
-        userPrompt: prompt,
-        count: count,              // 🔥 Всі одразу!
-        model: selectedModel,
-        enableQA: enableQA         // 🔍 QA валідація
-      });
-
-      console.log('📦 Received generation response:', response);
-
-      if (response.success) {
-        // Фільтруємо тільки успішні результати
-        const successfulItems = response.results
-          .filter(r => r.success && r.content)
-          .map(r => r.content);
+      setProgress({ current: 0, total: count });
+      
+      // 🔥 Спочатку завантажити старі не оцінені фото
+      console.log('🔍 Loading old unrated photos first...');
+      try {
+        const unratedResponse = await generationAPI.getUnrated(sessionId, 50);
         
-        console.log(`✅ Successfully generated ${successfulItems.length}/${count} images`);
-        
-        if (successfulItems.length > 0) {
-          setGeneratedItems(successfulItems);
-          setProgress({ current: successfulItems.length, total: count });
-          setGenerating(false);
-          setLoadingNext(false);
-          setGenerationComplete(true);
+        if (unratedResponse.success && unratedResponse.data.length > 0) {
+          const oldUnratedPhotos = unratedResponse.data;
+          console.log(`📋 Found ${oldUnratedPhotos.length} old unrated photos - adding to the end`);
           
-          console.log('🎉 All images ready for swiping!');
-        } else {
-          throw new Error('Не вдалося згенерувати жодного зображення');
+          // Зберігаємо старі фото окремо - додамо їх В КІНЕЦЬ після всіх нових
+          window.oldUnratedPhotos = oldUnratedPhotos;
         }
-        
-        // Якщо були помилки - показуємо
-        const failedCount = response.results.filter(r => !r.success).length;
-        if (failedCount > 0) {
-          console.warn(`⚠️ ${failedCount} generations failed`);
-        }
-      } else {
-        throw new Error(response.error || 'Невідома помилка генерації');
+      } catch (err) {
+        console.error('⚠️ Failed to load old unrated photos:', err);
       }
       
-      // Всі згенеровані
-      setGenerationComplete(true);
-      setLoadingNext(false);
+      // Статистика
+      let successCount = 0;
+      let failCount = 0;
+      
+      // Відправляємо запити з інтервалом 2-3 сек
+      for (let i = 0; i < count; i++) {
+        // Delay між запитами (крім першого)
+        if (i > 0) {
+          const delay = 2000 + Math.random() * 1000; // 2-3 сек
+          console.log(`⏳ Waiting ${Math.round(delay/1000)}s before next request...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        
+        // Відправляємо запит (не чекаємо відповіді!)
+        (async (index) => {
+          try {
+            console.log(`📤 [${index + 1}/${count}] Sending request...`);
+            
+            const response = await generationAPI.generate({
+              sessionId: sessionId,
+              projectId: projectId,
+              userId: user.id,
+              userPrompt: prompt,
+              count: 1,
+              model: selectedModel,
+              enableQA: enableQA
+            });
+            
+            if (response.success && response.results?.[0]?.success) {
+              const content = response.results[0].content;
+              console.log(`✅ [${index + 1}/${count}] Photo received! Adding to UI...`);
+              
+              successCount++;
+              
+              // ✅ Додаємо фото ВІДРАЗУ В UI!
+              setGeneratedItems(prev => [...prev, content]);
+              setProgress(p => ({ current: successCount, total: p.total }));
+              
+              // 🎉 Перше фото - прибираємо loading
+              if (index === 0) {
+                setGenerating(false);
+                setLoadingNext(false);
+                console.log('🎉 First photo ready! User can start swiping!');
+              }
+              
+              // 🔥 Останнє фото - додаємо старі unrated та встановлюємо completion
+              if (index === count - 1) {
+                console.log('🎉 Last photo generated!');
+                
+                if (window.oldUnratedPhotos?.length > 0) {
+                  const oldPhotos = window.oldUnratedPhotos;
+                  console.log(`📋 Adding ${oldPhotos.length} old unrated photos...`);
+                  
+                  setGeneratedItems(prev => {
+                    const newPhotoIds = prev.map(p => p.id);
+                    const uniqueOld = oldPhotos.filter(p => !newPhotoIds.includes(p.id));
+                    return [...prev, ...uniqueOld];
+                  });
+                  
+                  setProgress(p => ({ 
+                    current: 0, 
+                    total: successCount + oldPhotos.length 
+                  }));
+                  
+                  setTimeout(() => {
+                    alert(`📋 Додано ${oldPhotos.length} старих не оцінених фото в кінець!\n\n✅ Спочатку оціни ${successCount} нових, потім ${oldPhotos.length} старих!`);
+                  }, 500);
+                  
+                  delete window.oldUnratedPhotos;
+                }
+                
+                // ✅ Встановлюємо що генерація завершена
+                setGenerationComplete(true);
+                setGenerating(false);
+                setLoadingNext(false);
+                console.log('✅ Generation complete! Completion screen will show after last rating.');
+              }
+              
+            } else {
+              throw new Error(response.error || 'Generation failed');
+            }
+          } catch (error) {
+            console.error(`❌ [${index + 1}/${count}] Failed:`, error.message);
+            failCount++;
+            
+            setFailedGenerations(prev => [...prev, {
+              index: index + 1,
+              error: error.message
+            }]);
+          }
+        })(i);
+      }
+      
+      // НЕ чекаємо всіх! Користувач може свайпати одразу
+      console.log('✅ All requests sent! Photos will appear as they generate...');
       
     } catch (err) {
       setError(err.message || 'Помилка генерації контенту');
@@ -281,6 +351,20 @@ function GeneratePageV3() {
     setPrompt('');
     setLoadingNext(false);
     setGenerationComplete(false);
+    setFailedGenerations([]);
+  };
+
+  const handleGenerateMoreSamePrompt = async () => {
+    // Генерувати ще раз з тим же промптом
+    setShowCompletionScreen(false);
+    setGeneratedItems([]);
+    setCurrentIndex(0);
+    setLoadingNext(false);
+    setGenerationComplete(false);
+    setFailedGenerations([]);
+    
+    // Автоматично запустити генерацію
+    setTimeout(() => handleGenerate(), 100);
   };
 
   const handleViewGallery = () => {
@@ -560,13 +644,13 @@ function GeneratePageV3() {
                 <input
                   type="number"
                   min="1"
-                  max="1000"
+                  max="100"
                   value={count}
                   onChange={(e) => {
                     const val = parseInt(e.target.value) || 1;
-                    setCount(Math.min(1000, Math.max(1, val)));
+                    setCount(Math.min(100, Math.max(1, val)));
                   }}
-                  placeholder="Введіть кількість"
+                  placeholder="1-100"
                   className="count-input-field"
                 />
                 <span className="count-label">зображень</span>
@@ -574,7 +658,7 @@ function GeneratePageV3() {
 
               <div className="count-quick-buttons">
                 <span className="quick-label">Швидкий вибір:</span>
-                {[1, 5, 10, 20, 50, 100].map(num => (
+                {[5, 10, 20, 50, 100].map(num => (
                   <button
                     key={num}
                     type="button"
@@ -738,7 +822,7 @@ function GeneratePageV3() {
               />
             </div>
             <p className="progress-hint">
-              🚀 Паралельна генерація: всі {progress.total} зображень генеруються одночасно. Зачекайте завершення...
+              🚀 Streaming генерація: запити з інтервалом 2-3 сек. Фото з'являються ВІДРАЗУ! Можна свайпати! Отримано: {generatedItems.length}/{count}
             </p>
           </Card>
         )}
@@ -757,10 +841,17 @@ function GeneratePageV3() {
               
               <div className="completion-stats">
                 <div className="stat-item">
-                  <span className="stat-icon">📊</span>
-                  <span className="stat-label">Оцінено</span>
+                  <span className="stat-icon">✅</span>
+                  <span className="stat-label">Успішно</span>
                   <span className="stat-value">{generatedItems.length}</span>
                 </div>
+                {failedGenerations.length > 0 && (
+                  <div className="stat-item stat-warning">
+                    <span className="stat-icon">⚠️</span>
+                    <span className="stat-label">Помилки</span>
+                    <span className="stat-value">{failedGenerations.length}</span>
+                  </div>
+                )}
                 <div className="stat-item">
                   <span className="stat-icon">🎯</span>
                   <span className="stat-label">Проект</span>
@@ -773,20 +864,48 @@ function GeneratePageV3() {
                 </div>
               </div>
 
+              {/* Show failed generations details */}
+              {failedGenerations.length > 0 && (
+                <div className="failed-generations-info">
+                  <h4>⚠️ Помилки генерації ({failedGenerations.length}):</h4>
+                  <ul className="failed-list">
+                    {failedGenerations.slice(0, 3).map((failed, idx) => (
+                      <li key={idx}>
+                        <span className="failed-number">#{failed.index}</span>
+                        <span className="failed-error">{failed.error}</span>
+                      </li>
+                    ))}
+                    {failedGenerations.length > 3 && (
+                      <li className="failed-more">
+                        ...та ще {failedGenerations.length - 3} помилок
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
               <div className="completion-actions">
                 <button 
                   className="btn-primary-v3 completion-btn"
+                  onClick={handleGenerateMoreSamePrompt}
+                  title="Згенерувати ще з тим же промптом"
+                >
+                  <span className="btn-icon">🔄</span>
+                  <span>Згенерувати ще (той же промпт)</span>
+                </button>
+                <button 
+                  className="btn-secondary-v3 completion-btn"
                   onClick={handleGenerateMore}
                 >
                   <span className="btn-icon">🎨</span>
-                  <span>Згенерувати ще</span>
+                  <span>Новий промпт</span>
                 </button>
                 <button 
                   className="btn-secondary-v3 completion-btn"
                   onClick={handleViewGallery}
                 >
                   <span className="btn-icon">🖼️</span>
-                  <span>Переглянути галерею</span>
+                  <span>Галерея</span>
                 </button>
               </div>
 
@@ -824,7 +943,7 @@ function GeneratePageV3() {
           <div className="swipe-section-v3">
             <div className="swipe-header-v3">
               <h2>
-                👆 Оцініть зображення {currentIndex + 1} з {progress.total}
+                👆 Оцініть зображення {currentIndex + 1} з {generatedItems.length}
               </h2>
               <div className="swipe-progress-badges">
                 <span className="badge-current">Поточне: {currentIndex + 1}</span>
