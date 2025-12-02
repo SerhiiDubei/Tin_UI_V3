@@ -206,7 +206,20 @@ router.post('/generate', async (req, res) => {
             );
             
             if (!generationResult.success) {
-              throw new Error('Generation failed: ' + generationResult.error);
+              // Enhanced error message with details
+              const errorInfo = {
+                message: generationResult.error || 'Unknown error',
+                originalModel: model,
+                usedFallback: generationResult.usedFallback || false,
+                attempts: generationResult.attempts || 1,
+                modelUsed: generationResult.modelKey || model
+              };
+              throw new Error(JSON.stringify(errorInfo));
+            }
+            
+            // Log if fallback was used
+            if (generationResult.usedFallback) {
+              console.log(`⚠️  [${itemNumber}/${count}] Used fallback model: ${generationResult.modelKey}`);
             }
             
             console.log(`✅ [${itemNumber}/${count}] Image generated successfully`);
@@ -271,9 +284,20 @@ router.post('/generate', async (req, res) => {
             
           } catch (error) {
             console.error(`❌ [${itemNumber}/${count}] Generation failed:`, error);
+            
+            // Try to parse enhanced error info
+            let errorDetails = null;
+            try {
+              errorDetails = JSON.parse(error.message);
+            } catch (e) {
+              // Not JSON, use raw message
+              errorDetails = { message: error.message };
+            }
+            
             return {
               success: false,
-              error: error.message,
+              error: errorDetails.message || error.message,
+              errorDetails: errorDetails,
               itemNumber
             };
           }

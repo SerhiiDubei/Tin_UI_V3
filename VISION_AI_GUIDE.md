@@ -1,59 +1,111 @@
-# 📸 Vision AI - Complete Guide
+# 📸 Vision AI 2.0 - Complete Guide
 
 ## 🎯 Overview
 
-**Vision AI** дозволяє завантажити 1-20 **reference photos** і автоматично згенерувати prompt на основі їхнього **спільного стилю**.
+**Vision AI 2.0** використовує **2-stage adaptive analysis** для автоматичної генерації промптів:
+
+### 🆕 2-Stage Flow:
+
+```
+Stage 1: AUTO DETECTION 🔍
+→ Що на фото? (people, cars, fantasy, nature...)
+→ Quick analysis with low-detail images
+→ Returns category + confidence
+
+Stage 2: STYLE ANALYSIS 🎨  
+→ Adaptive prompt based on detected category
+→ Category-specific analysis guidelines
+→ Detailed high-resolution analysis
+→ Generates unified prompt
+```
+
+### 🚀 Benefits:
+
+- ✅ **Auto-adapts** to любого типу контенту
+- ✅ **Категорійно-специфічний** аналіз
+- ✅ **12 категорій**: 4 advertising + 8 content types
+- ✅ **Розпізнає advertising** - insurance, automotive, real estate, product ads
+- ✅ **Не залежить від типу проекту** - визначає реальний контент!
 
 Замість писати вручну:
 ```
 "Professional insurance advertising with warm lighting, patriotic colors..."
 ```
 
-Просто **завантаж 5 фото** страхових компаній → AI проаналізує → згенерує промпт!
+Просто **завантаж 5 фото** → AI автоматично визначить категорію → згенерує промпт!
 
 ---
 
-## 🚀 How It Works
+## 🚀 How It Works (2-Stage Flow)
 
-### Step-by-Step Flow:
+### 🆕 Step-by-Step Flow:
 
 ```
-1. User uploads 5 insurance ad photos
+1. User uploads photos (1-20)
    ↓
-2. (Optional) Adds comments to each:
-   Photo 1: "Geico, suburban setting"
-   Photo 2: "State Farm, family theme"
-   Photo 3: "Progressive, city environment"
-   ...
+2. (Optional) Adds comments + instructions
    ↓
-3. (Optional) Adds global instructions:
-   "Focus on American insurance advertising style"
+3. Clicks "Analyze"
    ↓
-4. Clicks "Analyze"
-   ↓
-5. Frontend:
+4. Frontend:
    - Compresses large photos (>2MB)
-   - Builds request with photos + comments
    - Sends to /api/vision/analyze
    ↓
-6. Backend (vision.service.js):
-   - Adds safety disclaimers
-   - Calls GPT-4o Vision API
-   - Analyzes COMMON STYLE across all photos
+5. Backend STAGE 1: 🔍 DETECTION
+   - detectPhotoContent()
+   - Uses low-detail images (faster/cheaper)
+   - Analyzes: "What's in these photos?"
+   - Returns: { category, confidence, subjects }
+   
+   Examples:
+   → "insurance_advertising" (95% confidence) "insurance ads with agents"
+   → "people_dating" (95% confidence) "young women lifestyle"
+   → "vehicles" (90% confidence) "sports cars"
+   → "fantasy_art" (85% confidence) "fantasy creatures"
    ↓
-7. GPT-4o Vision returns:
-   "Professional insurance advertising photography with:
-    - Warm natural lighting
-    - Patriotic red/white/blue color palette
-    - Diverse authentic American subjects
-    - Clean editorial composition
-    - High production value
-    - Trustworthy professional tone"
+6. Backend STAGE 2: 🎨 STYLE ANALYSIS
+   - getAdaptivePrompt(category) 
+   - Category-specific system prompt
+   - High-detail images for quality
+   - Analyzes: "What STYLE connects them?"
+   
+   For "people_dating":
+   → Analyzes: body type, age, clothing, pose, emotion, etc.
+   
+   For "vehicles":
+   → Analyzes: angle, location, lighting, mood, brand, etc.
    ↓
-8. Prompt displayed in UI
+7. GPT-4o Vision returns category-specific prompt
+   
+   Dating example:
+   "Young attractive women (22-28) with athletic fit body types,
+   confident poses in form-fitting summer outfits, soft natural
+   outdoor lighting, warm inviting colors, high dating appeal"
+   
+   Vehicles example:
+   "Luxury sports cars in dynamic 3/4 view, winding mountain roads,
+   golden hour dramatic lighting, aggressive stance, cinematic colors"
    ↓
-9. User clicks "Generate" → New photos in this style! ✨
+8. Response includes:
+   - prompt: generated text
+   - category: detected category
+   - confidence: detection confidence
+   - subjects: what was found
+   ↓
+9. Prompt displayed in UI
+   ↓
+10. User clicks "Generate" → New content in this style! ✨
 ```
+
+### 🎯 Key Improvements vs Old Version:
+
+| Old (Single Stage) | 🆕 New (2-Stage) |
+|-------------------|------------------|
+| Relied on `agentType` (dating/general) | **Auto-detects** content category |
+| Same prompt for all dating content | **Adaptive prompts** per category |
+| 2 categories (dating, general) | **8 categories** + mixed |
+| Analyzed with preset expectations | Analyzes **what's actually there** |
+| Could misinterpret content | **Smart detection** prevents errors |
 
 ---
 
@@ -449,9 +501,133 @@ Task: ${task}
 
 ---
 
+## 📦 Supported Categories (12 Total)
+
+Vision AI 2.0 автоматично визначає одну з 12 категорій:
+
+### 🆕 Advertising Categories (4)
+
+**Коли використовувати:** Коли завантажуєш РЕАЛЬНІ рекламні фото з marketing purpose.
+
+#### 1. **insurance_advertising** 🏠🚗
+- **Що:** Страхові реклами (auto, home, health, life)
+- **Ключові елементи:** Professional agents, families, vehicles, homes, text overlays
+- **Detection signs:** Text з prices/benefits, marketing composition (person+product+home)
+- **Example:** "Auto insurance advertising with professional agent, SUV, suburban home, American flag, warm lighting, patriotic colors, trust messaging"
+
+#### 2. **automotive_advertising** 🚗
+- **Що:** Автомобільні реклами і commercials
+- **Ключові елементи:** Vehicles з brand messaging, aspirational lifestyle scenes
+- **Detection signs:** Hero vehicle positioning, marketing angles, pristine condition
+- **Example:** "Luxury automotive advertising with 3/4 view, dramatic mountain road, golden hour, aspirational lifestyle appeal"
+
+#### 3. **real_estate_advertising** 🏡
+- **Що:** Реклами нерухомості
+- **Ключові елементи:** Properties з marketing staging, welcoming presentation
+- **Detection signs:** Real estate composition, property features, agent branding space
+- **Example:** "Real estate advertising with warm inviting exterior, staged interiors, bright natural lighting, family-friendly appeal"
+
+#### 4. **product_advertising** 📦
+- **Що:** Реклами продуктів
+- **Ключові елементи:** Products з marketing composition, brand messaging
+- **Detection signs:** Hero product positioning, lifestyle context, text placement space
+- **Example:** "Product advertising with clean studio lighting, lifestyle context, premium brand positioning, commercial quality"
+
+---
+
+### 📸 Content Categories (8)
+
+**Коли використовувати:** Коли завантажуєш звичайний контент БЕЗ marketing purpose.
+
+#### 5. **people_dating** 👥
+- Dating/lifestyle photography з focus на appearance, appeal
+- **Example:** "Young women in casual lifestyle, athletic bodies, confident poses, dating appeal"
+
+#### 6. **people_business** 💼
+- Business/professional photography
+- **Example:** "Corporate professionals in modern office, business casual attire, team collaboration"
+
+#### 7. **vehicles** 🚗
+- Vehicle photography (non-advertising)
+- **Example:** "Sports cars on winding roads, dynamic angles, golden hour lighting"
+
+#### 8. **nature_landscape** 🌄
+- Nature and landscapes
+- **Example:** "Mountain landscape at sunrise, dramatic clouds, vibrant colors"
+
+#### 9. **fantasy_art** 🐉
+- Fantasy/sci-fi artwork
+- **Example:** "Fantasy creatures in mystical forest, painterly digital art style, magical atmosphere"
+
+#### 10. **products** 📦
+- Product photography (non-advertising)
+- **Example:** "Clean product photography, white background, studio lighting"
+
+#### 11. **architecture** 🏛️
+- Architecture and interiors
+- **Example:** "Modern minimalist interior, natural light, clean lines"
+
+#### 12. **mixed** 🎭
+- Mixed categories
+- **Example:** "Mixed content unified by editorial style, consistent lighting, cohesive color palette"
+
+---
+
+### 🔍 How Detection Works
+
+**Stage 1: Check for ADVERTISING indicators:**
+
+```
+1. Text overlays? (prices, benefits, "Call Now", "Save 20%")
+2. Marketing composition? (person + product + lifestyle scene)
+3. Professional agents? (suits, posed with products)
+4. Brand elements? (logos, company names, taglines)
+```
+
+**If YES → Advertising category** (insurance, automotive, real estate, product)
+
+**If NO → Content category** (people, vehicles, nature, fantasy, etc.)
+
+---
+
+### 🆕 Real Example: Insurance Detection
+
+**Uploaded photos:**
+- Photo 1: Professional woman in suit, pickup truck, suburban home, American flag in background
+- Photo 2: Family outdoors, vehicle, text overlay "No Deductible", patriotic colors
+
+**Detection result:**
+```json
+{
+  "category": "insurance_advertising",
+  "confidence": 0.95,
+  "subjects": "insurance agents with families, vehicles, and homes",
+  "advertising": true
+}
+```
+
+**Why insurance_advertising, not people_business?**
+- ✅ Text overlays detected ("No Deductible")
+- ✅ Marketing composition (person + vehicle + home = insurance ad pattern)
+- ✅ Multiple focal points for marketing message
+- ✅ Patriotic aesthetic typical of American insurance ads
+
+**Generated prompt:**
+```
+"Auto insurance advertising photography for American family market, 
+featuring professional agents in business attire with vehicles and 
+suburban homes, warm afternoon golden hour lighting, patriotic 
+red/white/blue color accents with American flag, clean composition 
+with space for text overlays, trust-building messaging, soft natural 
+color grading, professional commercial quality ready for rates and 
+benefits text"
+```
+
+---
+
 ## 💡 Usage Examples
 
-### Example 1: Insurance Advertising
+### Example 1: Insurance Advertising (🆕 ADVERTISING CATEGORY)
 
 **Input:**
 - 5 photos from different insurance companies
@@ -493,6 +669,48 @@ slightly off-center composition, genuine expressions,
 iPhone-style depth of field, realistic imperfections, 
 approachable friendly atmosphere"
 ```
+
+---
+
+### Example 2B: Dating Profile - "Focus on Body" 🆕
+
+**Input:**
+- 10 photos of young women
+- Comments:
+  - Photo 1: "Beach, athletic"
+  - Photo 2: "Gym selfie"
+  - Photo 3: "Summer dress, outdoor"
+  - Photo 4: "Activewear, yoga"
+  - Photo 5: "Casual crop top"
+  - ...
+- Instructions: **"focus on body"**
+
+**Before Improvement:** ❌
+```
+"Casual lifestyle photography with natural lighting, 
+various outdoor and indoor settings, authentic expressions, 
+warm color tones, approachable feel"
+```
+*Problem: Generic, doesn't mention subject type, body, or appearance!*
+
+**After Improvement:** ✅
+```
+"Young attractive women (22-28) in casual lifestyle photography, 
+athletic fit body types with toned physiques showcased through 
+confident poses, form-fitting summer clothing (crop tops, sundresses, 
+activewear), soft natural lighting emphasizing body shape and contours, 
+mix of outdoor beach/urban and indoor gym settings, warm inviting tones, 
+genuine expressions with body-confident attitude, full-body and waist-up 
+compositions, authentic smartphone quality with high dating appeal"
+```
+*Solution: Specific about subject, age, body type, pose, clothing, appeal!*
+
+**Key Improvements:**
+1. ✅ Subject: "Young attractive women (22-28)" vs. generic "people"
+2. ✅ Body: "Athletic fit body types with toned physiques" vs. nothing
+3. ✅ Pose: "Confident poses showcasing body" vs. nothing  
+4. ✅ Clothing: "Form-fitting (crop tops, sundresses)" vs. nothing
+5. ✅ Appeal: "Body-confident attitude, high dating appeal" vs. nothing
 
 ---
 
@@ -607,12 +825,41 @@ professional studio-quality execution, aspirational lifestyle appeal"
 - "Emphasize American values"
 - "Capture authentic moments"
 - "Professional editorial style"
+- **🆕 Dating: "focus on body"** - emphasizes physique, pose, clothing
+- **🆕 Dating: "casual authentic"** - smartphone quality, natural
+- **🆕 Dating: "professional portraits"** - high-quality editorial
 
 ❌ **DON'T:**
 - List all photo contents again
 - Ask for specific objects
 - Request multiple styles
 - Write full prompts
+
+---
+
+### 4. 🆕 Dating-Specific Tips
+
+**For best dating results:**
+
+✅ **DO:**
+- Specify "focus on body" if physical appearance important
+- Use consistent subject type (all women, all men, or couples)
+- Add age range in comments if relevant ("early 20s", "30s")
+- Mention clothing style ("casual", "activewear", "formal")
+- Note setting preference ("beach", "urban", "home", "gym")
+
+❌ **DON'T:**
+- Mix different genders without context
+- Mix different age ranges (20s + 50s)
+- Upload completely different photo styles
+- Be too vague ("nice photos", "good looking")
+
+**User Instruction Examples:**
+- `"focus on body"` → Emphasizes physique, body type, pose
+- `"casual lifestyle"` → Authentic, relaxed, everyday moments
+- `"fitness focused"` → Athletic bodies, gym/outdoor active settings
+- `"elegant sophisticated"` → Polished, high-quality, classy appeal
+- `"authentic natural"` → Genuine, minimal editing, real person vibe
 
 ---
 
@@ -658,4 +905,5 @@ professional studio-quality execution, aspirational lifestyle appeal"
 ---
 
 **Ready to use Vision AI!** 📸✨
+
 

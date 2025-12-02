@@ -162,6 +162,9 @@ function GeneratePageV3() {
       let successCount = 0;
       let failCount = 0;
       
+      // 🔥 Collect all generation promises to track completion
+      const generationPromises = [];
+      
       // Відправляємо запити з інтервалом 2-3 сек
       for (let i = 0; i < count; i++) {
         // Delay між запитами (крім першого)
@@ -171,8 +174,8 @@ function GeneratePageV3() {
           await new Promise(resolve => setTimeout(resolve, delay));
         }
         
-        // Відправляємо запит (не чекаємо відповіді!)
-        (async (index) => {
+        // Відправляємо запит (збираємо promise)
+        const generationPromise = (async (index) => {
           try {
             console.log(`📤 [${index + 1}/${count}] Sending request...`);
             
@@ -203,38 +206,7 @@ function GeneratePageV3() {
                 console.log('🎉 First photo ready! User can start swiping!');
               }
               
-              // 🔥 Останнє фото - додаємо старі unrated та встановлюємо completion
-              if (index === count - 1) {
-                console.log('🎉 Last photo generated!');
-                
-                if (window.oldUnratedPhotos?.length > 0) {
-                  const oldPhotos = window.oldUnratedPhotos;
-                  console.log(`📋 Adding ${oldPhotos.length} old unrated photos...`);
-                  
-                  setGeneratedItems(prev => {
-                    const newPhotoIds = prev.map(p => p.id);
-                    const uniqueOld = oldPhotos.filter(p => !newPhotoIds.includes(p.id));
-                    return [...prev, ...uniqueOld];
-                  });
-                  
-                  setProgress(p => ({ 
-                    current: 0, 
-                    total: successCount + oldPhotos.length 
-                  }));
-                  
-                  setTimeout(() => {
-                    alert(`📋 Додано ${oldPhotos.length} старих не оцінених фото в кінець!\n\n✅ Спочатку оціни ${successCount} нових, потім ${oldPhotos.length} старих!`);
-                  }, 500);
-                  
-                  delete window.oldUnratedPhotos;
-                }
-                
-                // ✅ Встановлюємо що генерація завершена
-                setGenerationComplete(true);
-                setGenerating(false);
-                setLoadingNext(false);
-                console.log('✅ Generation complete! Completion screen will show after last rating.');
-              }
+              return { success: true, index };
               
             } else {
               throw new Error(response.error || 'Generation failed');
@@ -247,12 +219,73 @@ function GeneratePageV3() {
               index: index + 1,
               error: error.message
             }]);
+            
+            return { success: false, index, error: error.message };
           }
         })(i);
+        
+        generationPromises.push(generationPromise);
       }
       
-      // НЕ чекаємо всіх! Користувач може свайпати одразу
+      // НЕ чекаємо всіх для UI! Користувач може свайпати одразу
       console.log('✅ All requests sent! Photos will appear as they generate...');
+      
+      // 🔥 Але чекаємо в фоні, щоб встановити completion коли ВСЕ завершиться
+      Promise.all(generationPromises).then(results => {
+        console.log('');
+        console.log('='.repeat(80));
+        console.log('📊 ALL GENERATION REQUESTS COMPLETE');
+        console.log('='.repeat(80));
+        console.log(`✅ Successful: ${results.filter(r => r.success).length}`);
+        console.log(`❌ Failed: ${results.filter(r => !r.success).length}`);
+        console.log('='.repeat(80));
+        console.log('');
+        
+        const successfulCount = results.filter(r => r.success).length;
+        const failedCount = results.filter(r => !r.success).length;
+        
+        // 🔥 Додаємо старі unrated фото (якщо є)
+        if (window.oldUnratedPhotos?.length > 0) {
+          const oldPhotos = window.oldUnratedPhotos;
+          console.log(`📋 Adding ${oldPhotos.length} old unrated photos...`);
+          
+          setGeneratedItems(prev => {
+            const newPhotoIds = prev.map(p => p.id);
+            const uniqueOld = oldPhotos.filter(p => !newPhotoIds.includes(p.id));
+            return [...prev, ...uniqueOld];
+          });
+          
+          setProgress(p => ({ 
+            current: 0, 
+            total: successfulCount + oldPhotos.length 
+          }));
+          
+          setTimeout(() => {
+            alert(`📋 Додано ${oldPhotos.length} старих не оцінених фото в кінець!\n\n✅ Спочатку оціни ${successfulCount} нових, потім ${oldPhotos.length} старих!`);
+          }, 500);
+          
+          delete window.oldUnratedPhotos;
+        }
+        
+        // ✅ Встановлюємо що генерація ЗАВЕРШЕНА (незалежно від success/fail)
+        setGenerationComplete(true);
+        setGenerating(false);
+        setLoadingNext(false);
+        console.log('✅ Generation complete! Completion screen will show after last rating.');
+        
+        // Показуємо підсумок якщо були failed
+        if (failedCount > 0) {
+          setTimeout(() => {
+            alert(`⚠️ Генерація завершена:\n\n✅ Успішно: ${successfulCount}\n❌ Помилки: ${failedCount}\n\n${failedCount > 0 ? 'Деякі фото не згенерувались через перевантаження моделі.\nСпробуйте згенерувати ще раз або використайте іншу модель!' : ''}`);
+          }, 1000);
+        }
+      }).catch(err => {
+        console.error('❌ Generation tracking error:', err);
+        // Все одно встановлюємо completion
+        setGenerationComplete(true);
+        setGenerating(false);
+        setLoadingNext(false);
+      });
       
     } catch (err) {
       setError(err.message || 'Помилка генерації контенту');
