@@ -409,6 +409,88 @@
 @media (max-width: 768px) {
   .rating-buttons-v3 {
     grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .rating-btn {
+    padding: 0.875rem 0.75rem;
+    font-size: 0.9rem;
+  }
+  
+  .rating-btn .btn-icon {
+    font-size: 1.75rem;
+  }
+  
+  .rating-btn .btn-label {
+    font-size: 0.8rem;
+  }
+  
+  /* Збільшуємо розмір фото на мобільних */
+  .image-card-v3 {
+    max-width: 100%;
+    margin: 0 -1rem;
+    width: calc(100% + 2rem);
+  }
+  
+  .generated-image-v3 {
+    border-radius: 0;
+    min-height: 400px;
+    object-fit: cover;
+  }
+  
+  /* Зменшуємо розмір свайп індикаторів */
+  .swipe-indicator {
+    font-size: 2rem;
+    padding: 1rem 1.5rem;
+  }
+  
+  /* Адаптуємо layout сторінки */
+  .swipe-layout-v3 {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .prompt-display-card,
+  .enhanced-prompt-card {
+    display: none; /* Ховаємо промпти на мобільних для економії місця */
+  }
+  
+  .rating-card-container-v3 {
+    max-width: 100%;
+  }
+}
+
+/* Extra small devices (phones in portrait mode) */
+@media (max-width: 480px) {
+  .rating-buttons-v3 {
+    gap: 0.5rem;
+  }
+  
+  .rating-btn {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.85rem;
+  }
+  
+  .rating-btn .btn-icon {
+    font-size: 1.5rem;
+  }
+  
+  .rating-btn .btn-label {
+    font-size: 0.75rem;
+  }
+  
+  /* Фото на весь екран */
+  .generated-image-v3 {
+    min-height: 450px;
+    max-height: 60vh;
+  }
+  
+  .swipe-header-v3 h2 {
+    font-size: 1.1rem;
+  }
+  
+  .swipe-progress-badges {
+    font-size: 0.8rem;
   }
 }
 
