@@ -137,156 +137,47 @@ function GeneratePageV3() {
     setGenerationComplete(false);
 
     try {
-      // 🚀 STREAMING GENERATION: Запити з інтервалом, фото з'являються ВІДРАЗУ
-      console.log(`🔥 Starting STREAMING generation of ${count} images with 2-3 sec interval...`);
+      // 🚀 PARALLEL GENERATION: одночасна генерація всіх зображень
+      console.log(`🔥 Starting PARALLEL generation of ${count} images...`);
       
-      setProgress({ current: 0, total: count });
-      
-      // 🔥 Спочатку завантажити старі не оцінені фото
-      console.log('🔍 Loading old unrated photos first...');
-      try {
-        const unratedResponse = await generationAPI.getUnrated(sessionId, 50);
-        
-        if (unratedResponse.success && unratedResponse.data.length > 0) {
-          const oldUnratedPhotos = unratedResponse.data;
-          console.log(`📋 Found ${oldUnratedPhotos.length} old unrated photos - adding to the end`);
-          
-          // Зберігаємо старі фото окремо - додамо їх В КІНЕЦЬ після всіх нових
-          window.oldUnratedPhotos = oldUnratedPhotos;
-        }
-      } catch (err) {
-        console.error('⚠️ Failed to load old unrated photos:', err);
-      }
-      
-      // Статистика
-      let successCount = 0;
-      let failCount = 0;
-      
-      // 🔥 Collect all generation promises to track completion
-      const generationPromises = [];
-      
-      // Відправляємо запити з інтервалом 2-3 сек
-      for (let i = 0; i < count; i++) {
-        // Delay між запитами (крім першого)
-        if (i > 0) {
-          const delay = 2000 + Math.random() * 1000; // 2-3 сек
-          console.log(`⏳ Waiting ${Math.round(delay/1000)}s before next request...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-        
-        // Відправляємо запит (збираємо promise)
-        const generationPromise = (async (index) => {
-          try {
-            console.log(`📤 [${index + 1}/${count}] Sending request...`);
-            
-            const response = await generationAPI.generate({
-              sessionId: sessionId,
-              projectId: projectId,
-              userId: user.id,
-              userPrompt: prompt,
-              count: 1,
-              model: selectedModel,
-              enableQA: enableQA
-            });
-            
-            if (response.success && response.results?.[0]?.success) {
-              const content = response.results[0].content;
-              console.log(`✅ [${index + 1}/${count}] Photo received! Adding to UI...`);
-              
-              successCount++;
-              
-              // ✅ Додаємо фото ВІДРАЗУ В UI!
-              setGeneratedItems(prev => [...prev, content]);
-              setProgress(p => ({ current: successCount, total: p.total }));
-              
-              // 🎉 Перше фото - прибираємо loading
-              if (index === 0) {
-                setGenerating(false);
-                setLoadingNext(false);
-                console.log('🎉 First photo ready! User can start swiping!');
-              }
-              
-              return { success: true, index };
-              
-            } else {
-              throw new Error(response.error || 'Generation failed');
-            }
-          } catch (error) {
-            console.error(`❌ [${index + 1}/${count}] Failed:`, error.message);
-            failCount++;
-            
-            setFailedGenerations(prev => [...prev, {
-              index: index + 1,
-              error: error.message
-            }]);
-            
-            return { success: false, index, error: error.message };
-          }
-        })(i);
-        
-        generationPromises.push(generationPromise);
-      }
-      
-      // НЕ чекаємо всіх для UI! Користувач може свайпати одразу
-      console.log('✅ All requests sent! Photos will appear as they generate...');
-      
-      // 🔥 Але чекаємо в фоні, щоб встановити completion коли ВСЕ завершиться
-      Promise.all(generationPromises).then(results => {
-        console.log('');
-        console.log('='.repeat(80));
-        console.log('📊 ALL GENERATION REQUESTS COMPLETE');
-        console.log('='.repeat(80));
-        console.log(`✅ Successful: ${results.filter(r => r.success).length}`);
-        console.log(`❌ Failed: ${results.filter(r => !r.success).length}`);
-        console.log('='.repeat(80));
-        console.log('');
-        
-        const successfulCount = results.filter(r => r.success).length;
-        const failedCount = results.filter(r => !r.success).length;
-        
-        // 🔥 Додаємо старі unrated фото (якщо є)
-        if (window.oldUnratedPhotos?.length > 0) {
-          const oldPhotos = window.oldUnratedPhotos;
-          console.log(`📋 Adding ${oldPhotos.length} old unrated photos...`);
-          
-          setGeneratedItems(prev => {
-            const newPhotoIds = prev.map(p => p.id);
-            const uniqueOld = oldPhotos.filter(p => !newPhotoIds.includes(p.id));
-            return [...prev, ...uniqueOld];
-          });
-          
-          setProgress(p => ({ 
-            current: 0, 
-            total: successfulCount + oldPhotos.length 
-          }));
-          
-          setTimeout(() => {
-            alert(`📋 Додано ${oldPhotos.length} старих не оцінених фото в кінець!\n\n✅ Спочатку оціни ${successfulCount} нових, потім ${oldPhotos.length} старих!`);
-          }, 500);
-          
-          delete window.oldUnratedPhotos;
-        }
-        
-        // ✅ Встановлюємо що генерація ЗАВЕРШЕНА (незалежно від success/fail)
-        setGenerationComplete(true);
-        setGenerating(false);
-        setLoadingNext(false);
-        console.log('✅ Generation complete! Completion screen will show after last rating.');
-        
-        // Показуємо підсумок якщо були failed
-        if (failedCount > 0) {
-          setTimeout(() => {
-            alert(`⚠️ Генерація завершена:\n\n✅ Успішно: ${successfulCount}\n❌ Помилки: ${failedCount}\n\n${failedCount > 0 ? 'Деякі фото не згенерувались через перевантаження моделі.\nСпробуйте згенерувати ще раз або використайте іншу модель!' : ''}`);
-          }, 1000);
-        }
-      }).catch(err => {
-        console.error('❌ Generation tracking error:', err);
-        // Все одно встановлюємо completion
-        setGenerationComplete(true);
-        setGenerating(false);
-        setLoadingNext(false);
+      const response = await generationAPI.generate({
+        sessionId: sessionId,
+        projectId: projectId,
+        userId: user.id,
+        userPrompt: prompt,
+        count: count,              // 🔥 Всі одразу!
+        model: selectedModel
       });
-      
+
+      console.log('📦 Received generation response:', response);
+
+      if (response.success) {
+        // Фільтруємо тільки успішні результати
+        const successfulItems = response.results
+          .filter(r => r.success && r.content)
+          .map(r => r.content);
+        
+        const failedCount = response.results.filter(r => !r.success).length;
+        
+        console.log(`✅ Successfully generated ${successfulItems.length}/${count} images`);
+        if (failedCount > 0) {
+          console.warn(`⚠️ ${failedCount} generations failed`);
+        }
+        
+        if (successfulItems.length > 0) {
+          setGeneratedItems(successfulItems);
+          setProgress({ current: successfulItems.length, total: count });
+          setGenerating(false);
+          setLoadingNext(false);
+          setGenerationComplete(true);
+          
+          console.log('🎉 All images ready for swiping!');
+        } else {
+          throw new Error('Не вдалося згенерувати жодного зображення');
+        }
+      } else {
+        throw new Error(response.error || 'Невідома помилка генерації');
+      }
     } catch (err) {
       setError(err.message || 'Помилка генерації контенту');
       setGenerating(false);
