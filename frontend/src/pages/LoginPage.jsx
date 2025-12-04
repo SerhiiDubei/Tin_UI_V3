@@ -14,7 +14,7 @@ function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
+  // const [autoLoginAttempted, setAutoLoginAttempted] = useState(false); // Unused - auto-login disabled
   const { login, register } = useAuth();
   const navigate = useNavigate();
   const formRef = useRef(null);
@@ -92,7 +92,7 @@ function LoginPage() {
     setFullName('');
     setPassword('');
     setConfirmPassword('');
-    setAutoLoginAttempted(false);
+    // setAutoLoginAttempted(false); // Unused - auto-login disabled
   };
 
   // Load saved username on mount
@@ -103,27 +103,28 @@ function LoginPage() {
     }
   }, [isRegisterMode]);
 
-  // Auto-login if form fields are filled by browser
-  useEffect(() => {
-    if (isRegisterMode || autoLoginAttempted || loading) return;
-
-    const checkAutoFill = setTimeout(() => {
-      const usernameInput = document.getElementById('username');
-      const passwordInput = document.getElementById('password');
-      
-      if (usernameInput?.value && passwordInput?.value) {
-        console.log('Auto-login: detected filled fields');
-        setAutoLoginAttempted(true);
-        
-        // Auto-submit form
-        if (formRef.current) {
-          formRef.current.requestSubmit();
-        }
-      }
-    }, 500);
-
-    return () => clearTimeout(checkAutoFill);
-  }, [isRegisterMode, autoLoginAttempted, loading]);
+  // Auto-login DISABLED - User must explicitly click login button
+  // This allows users to switch accounts without automatic re-login
+  // useEffect(() => {
+  //   if (isRegisterMode || autoLoginAttempted || loading) return;
+  //
+  //   const checkAutoFill = setTimeout(() => {
+  //     const usernameInput = document.getElementById('username');
+  //     const passwordInput = document.getElementById('password');
+  //     
+  //     if (usernameInput?.value && passwordInput?.value) {
+  //       console.log('Auto-login: detected filled fields');
+  //       setAutoLoginAttempted(true);
+  //       
+  //       // Auto-submit form
+  //       if (formRef.current) {
+  //         formRef.current.requestSubmit();
+  //       }
+  //     }
+  //   }, 500);
+  //
+  //   return () => clearTimeout(checkAutoFill);
+  // }, [isRegisterMode, autoLoginAttempted, loading]);
 
   // Quick login buttons for testing
   const quickLogin = async (role) => {

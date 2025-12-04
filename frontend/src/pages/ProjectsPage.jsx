@@ -17,7 +17,7 @@ function ProjectsPage() {
     category: '',
     description: ''
   });
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const loadProjects = useCallback(async () => {
@@ -94,9 +94,22 @@ function ProjectsPage() {
             <h1>📁 Мої Проєкти</h1>
             <p>Керуйте своїми AI проєктами та сесіями генерації</p>
           </div>
-          <Button onClick={() => setShowCreateModal(true)} size="large">
-            ➕ Створити Проєкт
-          </Button>
+          <div className="header-actions">
+            <span className="user-info">👤 {user.username} {user.role === 'admin' ? '👑' : ''}</span>
+            <Button onClick={() => setShowCreateModal(true)} size="large">
+              ➕ Створити Проєкт
+            </Button>
+            <Button 
+              onClick={() => {
+                logout();
+                navigate('/login');
+              }} 
+              variant="secondary"
+              size="small"
+            >
+              🚪 Вийти
+            </Button>
+          </div>
         </div>
 
         {error && (

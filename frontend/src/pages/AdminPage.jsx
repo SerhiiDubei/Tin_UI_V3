@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import Button from '../components/Button';
 import Card from '../components/Card';
 import Loading from '../components/Loading';
 import './AdminPage.css';
@@ -19,7 +20,7 @@ function AdminPage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     loadAdminData();
@@ -169,8 +170,20 @@ function AdminPage() {
     <div className="admin-page">
       <div className="admin-container">
         <div className="admin-header">
-          <h1>👑 Admin Dashboard</h1>
-          <p>Manage users and monitor system activity</p>
+          <div>
+            <h1>👑 Admin Dashboard</h1>
+            <p>Manage users and monitor system activity</p>
+          </div>
+          <Button 
+            onClick={() => {
+              logout();
+              window.location.href = '/login';
+            }} 
+            variant="secondary"
+            size="small"
+          >
+            🚪 Вийти
+          </Button>
         </div>
 
         {/* System Maintenance */}
