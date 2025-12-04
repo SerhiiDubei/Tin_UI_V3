@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Button from '../components/Button';
@@ -14,8 +14,10 @@ function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const formRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,17 +25,29 @@ function LoginPage() {
     setLoading(true);
 
     try {
+      // Get actual values from form fields (handles autocomplete)
+      const formData = new FormData(e.target);
+      const formUsername = formData.get('username') || username;
+      const formPassword = formData.get('password') || password;
+      const formEmail = formData.get('email') || email;
+      const formFullName = formData.get('fullName') || fullName;
+      const formConfirmPassword = formData.get('confirmPassword') || confirmPassword;
+
       if (isRegisterMode) {
         // Registration
-        if (password !== confirmPassword) {
+        if (formPassword !== formConfirmPassword) {
           throw new Error('Паролі не співпадають');
         }
 
-        if (password.length < 6) {
+        if (formPassword.length < 6) {
           throw new Error('Пароль має бути мінімум 6 символів');
         }
 
-        await register(username, email, password, fullName);
+        await register(formUsername, formEmail, formPassword, formFullName);
+        
+        // Remember username for next time
+        localStorage.setItem('savedUsername', formUsername);
+        
         navigate('/projects');
       } else {
         // Login
@@ -41,7 +55,7 @@ function LoginPage() {
         const response = await fetch(`${API_URL}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify({ username: formUsername, password: formPassword })
         });
 
         const data = await response.json();
@@ -52,6 +66,9 @@ function LoginPage() {
 
         // Save user data
         login(data.user);
+
+        // Remember username for next time
+        localStorage.setItem('savedUsername', formUsername);
 
         // Redirect based on role
         if (data.user.role === 'admin') {
@@ -75,7 +92,38 @@ function LoginPage() {
     setFullName('');
     setPassword('');
     setConfirmPassword('');
+    setAutoLoginAttempted(false);
   };
+
+  // Load saved username on mount
+  useEffect(() => {
+    const savedUsername = localStorage.getItem('savedUsername');
+    if (savedUsername && !isRegisterMode) {
+      setUsername(savedUsername);
+    }
+  }, [isRegisterMode]);
+
+  // Auto-login if form fields are filled by browser
+  useEffect(() => {
+    if (isRegisterMode || autoLoginAttempted || loading) return;
+
+    const checkAutoFill = setTimeout(() => {
+      const usernameInput = document.getElementById('username');
+      const passwordInput = document.getElementById('password');
+      
+      if (usernameInput?.value && passwordInput?.value) {
+        console.log('Auto-login: detected filled fields');
+        setAutoLoginAttempted(true);
+        
+        // Auto-submit form
+        if (formRef.current) {
+          formRef.current.requestSubmit();
+        }
+      }
+    }, 500);
+
+    return () => clearTimeout(checkAutoFill);
+  }, [isRegisterMode, autoLoginAttempted, loading]);
 
   // Quick login buttons for testing
   const quickLogin = async (role) => {
@@ -83,14 +131,40 @@ function LoginPage() {
       ? { username: 'admin', password: 'admin123' }
       : { username: 'testuser', password: 'test123' };
     
-    setUsername(credentials.username);
-    setPassword(credentials.password);
-    
-    // Auto-submit after setting values
-    setTimeout(() => {
-      const form = document.getElementById('login-form');
-      if (form) form.requestSubmit();
-    }, 100);
+    setError('');
+    setLoading(true);
+
+    try {
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      // Save user data
+      login(data.user);
+
+      // Redirect based on role
+      if (data.user.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/projects');
+      }
+    } catch (err) {
+      setError(err.message);
+      // Fill form on error so user can try again
+      setUsername(credentials.username);
+      setPassword(credentials.password);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -119,11 +193,18 @@ function LoginPage() {
             </button>
           </div>
 
-          <form id="login-form" onSubmit={handleSubmit}>
+          <form 
+            id="login-form" 
+            ref={formRef} 
+            onSubmit={handleSubmit}
+            autoComplete="on"
+            name={isRegisterMode ? "register-form" : "login-form"}
+          >
             <div className="form-group">
               <label htmlFor="username">Username *</label>
               <input
                 id="username"
+                name="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -139,6 +220,7 @@ function LoginPage() {
                   <label htmlFor="email">Email *</label>
                   <input
                     id="email"
+                    name="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -152,6 +234,7 @@ function LoginPage() {
                   <label htmlFor="fullName">Повне ім'я (необов'язково)</label>
                   <input
                     id="fullName"
+                    name="fullName"
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
@@ -166,6 +249,7 @@ function LoginPage() {
               <label htmlFor="password">Пароль *</label>
               <input
                 id="password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -180,6 +264,7 @@ function LoginPage() {
                 <label htmlFor="confirmPassword">Підтвердіть пароль *</label>
                 <input
                   id="confirmPassword"
+                  name="confirmPassword"
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -199,7 +284,7 @@ function LoginPage() {
             <Button 
               type="submit" 
               fullWidth 
-              disabled={loading || !username || !password || (isRegisterMode && (!email || !confirmPassword))}
+              disabled={loading}
             >
               {loading 
                 ? '🔄 Завантаження...' 

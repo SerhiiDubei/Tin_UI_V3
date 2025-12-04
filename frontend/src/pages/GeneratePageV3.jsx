@@ -158,10 +158,6 @@ function GeneratePageV3() {
         console.error('⚠️ Failed to load old unrated photos:', err);
       }
       
-      // Статистика
-      let successCount = 0;
-      let failCount = 0;
-      
       // 🔥 Collect all generation promises to track completion
       const generationPromises = [];
       
@@ -193,11 +189,10 @@ function GeneratePageV3() {
               const content = response.results[0].content;
               console.log(`✅ [${index + 1}/${count}] Photo received! Adding to UI...`);
               
-              successCount++;
-              
               // ✅ Додаємо фото ВІДРАЗУ В UI!
               setGeneratedItems(prev => [...prev, content]);
-              setProgress(p => ({ current: successCount, total: p.total }));
+              // Update progress using functional update to avoid closure issues
+              setProgress(p => ({ current: p.current + 1, total: p.total }));
               
               // 🎉 Перше фото - прибираємо loading
               if (index === 0) {
@@ -213,7 +208,6 @@ function GeneratePageV3() {
             }
           } catch (error) {
             console.error(`❌ [${index + 1}/${count}] Failed:`, error.message);
-            failCount++;
             
             setFailedGenerations(prev => [...prev, {
               index: index + 1,

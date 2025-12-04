@@ -6,33 +6,56 @@ import './AdminPage.css';
 
 function AdminPage() {
   const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
   const [allContent, setAllContent] = useState([]);
   const [allRatings, setAllRatings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('users'); // users, content, ratings
   const [migrating, setMigrating] = useState(false);
   const [migrationResult, setMigrationResult] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [userDetails, setUserDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const { user } = useAuth();
 
   useEffect(() => {
     loadAdminData();
   }, []);
 
+  useEffect(() => {
+    // Filter users based on search term
+    const filtered = users.filter(u =>
+      u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (u.full_name && u.full_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+    setFilteredUsers(filtered);
+    setCurrentPage(1);
+  }, [searchTerm, users]);
+
   const loadAdminData = async () => {
     try {
       setLoading(true);
       const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-      // Load all data
-      const [usersRes, contentRes, ratingsRes] = await Promise.all([
+      // Load all data (content_v3 includes ratings in content_v3.rating field)
+      const [usersRes, contentRes] = await Promise.all([
         fetch(`${API_URL}/admin/users`).then(r => r.json()),
-        fetch(`${API_URL}/content`).then(r => r.json()),
-        fetch(`${API_URL}/ratings`).then(r => r.json())
+        fetch(`${API_URL}/admin/all-content`).then(r => r.json())
       ]);
 
       if (usersRes.success) setUsers(usersRes.data || []);
-      if (contentRes.success) setAllContent(contentRes.data || []);
-      if (ratingsRes.success) setAllRatings(ratingsRes.data || []);
+      if (contentRes.success) {
+        const content = contentRes.data || [];
+        setAllContent(content);
+        // Extract ratings from content (rating field in content_v3)
+        // All ratings are stored in content_v3.rating and synced to session_ratings
+        const ratings = content.filter(c => c.rating !== null && c.rating !== undefined);
+        setAllRatings(ratings);
+      }
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
@@ -47,13 +70,44 @@ function AdminPage() {
 
   const getUserStats = (userId) => {
     const userContent = allContent.filter(c => c.user_id === userId);
-    const userRatings = allRatings.filter(r => r.user_id === userId);
+    // Ratings from content_v3 (which are synced to session_ratings)
+    const ratings = userContent.filter(c => c.rating !== null && c.rating !== undefined);
+    
+    const likes = ratings.filter(c => c.rating === 1 || c.rating === 3).length;
+    const dislikes = ratings.filter(c => c.rating === -1 || c.rating === -3).length;
+    
     return {
       contentCount: userContent.length,
-      ratingsCount: userRatings.length,
-      likes: userRatings.filter(r => r.direction === 'right').length,
-      dislikes: userRatings.filter(r => r.direction === 'left').length
+      ratingsCount: ratings.length,
+      likes: likes,
+      dislikes: dislikes
     };
+  };
+
+  const loadUserDetails = async (userId) => {
+    try {
+      setLoadingDetails(true);
+      setSelectedUser(userId);
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+      const response = await fetch(`${API_URL}/admin/users/${userId}/details`);
+      const result = await response.json();
+
+      if (result.success) {
+        setUserDetails(result.data);
+      } else {
+        console.error('Failed to load user details:', result.error);
+      }
+    } catch (err) {
+      console.error('Error loading user details:', err);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  const closeUserModal = () => {
+    setSelectedUser(null);
+    setUserDetails(null);
   };
 
   const handleMigrateUrls = async () => {
@@ -96,6 +150,12 @@ function AdminPage() {
       setMigrating(false);
     }
   };
+
+  // Pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentUsers = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
 
   if (loading) {
     return (
@@ -170,11 +230,11 @@ function AdminPage() {
             <div className="stat-icon">📊</div>
             <div className="stat-value">
               {allRatings.length > 0 
-                ? `${((allRatings.filter(r => r.direction === 'right').length / allRatings.length) * 100).toFixed(1)}%`
+                ? `${((allRatings.filter(r => r.rating === 1 || r.rating === 3).length / allRatings.length) * 100).toFixed(1)}%`
                 : '0%'
               }
             </div>
-            <div className="stat-label">Like Rate</div>
+            <div className="stat-label">Positive Rate</div>
           </Card>
         </div>
 
@@ -203,13 +263,28 @@ function AdminPage() {
         {/* Users Tab */}
         {activeTab === 'users' && (
           <Card title="👥 Users Management" className="data-card">
-            {users.length === 0 ? (
+            {/* Search */}
+            <div className="search-section">
+              <input
+                type="text"
+                className="search-input"
+                placeholder="🔍 Search by username, email, or name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <div className="search-results">
+                Showing {filteredUsers.length} of {users.length} users
+              </div>
+            </div>
+
+            {filteredUsers.length === 0 ? (
               <p className="empty-message">No users found</p>
             ) : (
-              <div className="table-wrapper">
-                <table className="data-table">
-                  <thead>
-                    <tr>
+              <>
+                <div className="table-wrapper">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
                       <th>Username</th>
                       <th>Email</th>
                       <th>Role</th>
@@ -218,43 +293,70 @@ function AdminPage() {
                       <th>Like Rate</th>
                       <th>Created</th>
                       <th>Last Login</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map((u) => {
-                      const stats = getUserStats(u.id);
-                      const likeRate = stats.ratingsCount > 0 
-                        ? ((stats.likes / stats.ratingsCount) * 100).toFixed(1) 
-                        : '0';
-                      return (
-                        <tr key={u.id}>
-                          <td>
-                            <strong>{u.username}</strong>
-                            {u.id === user?.id && <span className="badge me">You</span>}
-                          </td>
-                          <td>{u.email}</td>
-                          <td>
-                            <span className={`badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}`}>
-                              {u.role}
-                            </span>
-                          </td>
-                          <td>{stats.contentCount}</td>
-                          <td>{stats.ratingsCount}</td>
-                          <td>{likeRate}%</td>
-                          <td>{formatDate(u.created_at)}</td>
-                          <td>{formatDate(u.last_login_at)}</td>
-                          <td>
-                            <span className={`badge ${u.is_active ? 'badge-active' : 'badge-inactive'}`}>
-                              {u.is_active ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                      <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentUsers.map((u) => {
+                        const stats = getUserStats(u.id);
+                        const likeRate = stats.ratingsCount > 0 
+                          ? ((stats.likes / stats.ratingsCount) * 100).toFixed(1) 
+                          : '0';
+                        return (
+                          <tr key={u.id}>
+                            <td>
+                              <strong>{u.username}</strong>
+                              {u.id === user?.id && <span className="badge me">You</span>}
+                            </td>
+                            <td>{u.email}</td>
+                            <td>
+                              <span className={`badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}`}>
+                                {u.role}
+                              </span>
+                            </td>
+                            <td>{stats.contentCount}</td>
+                            <td>{stats.ratingsCount}</td>
+                            <td>{likeRate}%</td>
+                            <td>{formatDate(u.created_at)}</td>
+                            <td>{formatDate(u.last_login_at)}</td>
+                            <td>
+                              <button
+                                className="btn-details"
+                                onClick={() => loadUserDetails(u.id)}
+                              >
+                                📊 Details
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="pagination">
+                    <button
+                      className="pagination-btn"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      ← Previous
+                    </button>
+                    <span className="pagination-info">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      className="pagination-btn"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </Card>
         )}
@@ -273,15 +375,21 @@ function AdminPage() {
                       <th>Prompt</th>
                       <th>User</th>
                       <th>Type</th>
-                      <th>Likes</th>
-                      <th>Dislikes</th>
-                      <th>Superlikes</th>
+                      <th>Rating</th>
+                      <th>Session</th>
                       <th>Created</th>
                     </tr>
                   </thead>
                   <tbody>
                     {allContent.slice(0, 50).map((c) => {
                       const contentUser = users.find(u => u.id === c.user_id);
+                      const getRatingBadge = (rating) => {
+                        if (rating === 3) return '⭐ Superlike';
+                        if (rating === 1) return '👍 Like';
+                        if (rating === -1) return '👎 Dislike';
+                        if (rating === -3) return '🔄 Reroll';
+                        return '-';
+                      };
                       return (
                         <tr key={c.id}>
                           <td>
@@ -295,10 +403,9 @@ function AdminPage() {
                             {c.original_prompt || 'N/A'}
                           </td>
                           <td>{contentUser?.username || 'Unknown'}</td>
-                          <td>{c.media_type}</td>
-                          <td>{c.like_count || 0}</td>
-                          <td>{c.dislike_count || 0}</td>
-                          <td>{c.superlike_count || 0}</td>
+                          <td>{c.type || 'image'}</td>
+                          <td>{getRatingBadge(c.rating)}</td>
+                          <td className="prompt-cell">{c.session_id?.substring(0, 8) || '-'}</td>
                           <td>{formatDate(c.created_at)}</td>
                         </tr>
                       );
@@ -320,37 +427,47 @@ function AdminPage() {
                 <table className="data-table">
                   <thead>
                     <tr>
+                      <th>Preview</th>
                       <th>User</th>
-                      <th>Content</th>
-                      <th>Direction</th>
+                      <th>Prompt</th>
+                      <th>Rating</th>
                       <th>Comment</th>
-                      <th>Latency</th>
-                      <th>Created</th>
+                      <th>Rated At</th>
                     </tr>
                   </thead>
                   <tbody>
                     {allRatings.slice(0, 100).map((r) => {
                       const ratingUser = users.find(u => u.id === r.user_id);
-                      const content = allContent.find(c => c.id === r.content_id);
+                      const getRatingDisplay = (rating) => {
+                        if (rating === 3) return { text: '⭐ Superlike', class: 'direction-up' };
+                        if (rating === 1) return { text: '👍 Like', class: 'direction-right' };
+                        if (rating === -1) return { text: '👎 Dislike', class: 'direction-left' };
+                        if (rating === -3) return { text: '🔄 Reroll', class: 'direction-down' };
+                        return { text: '-', class: '' };
+                      };
+                      const ratingDisplay = getRatingDisplay(r.rating);
                       return (
                         <tr key={r.id}>
+                          <td>
+                            <img 
+                              src={r.url} 
+                              alt="preview" 
+                              className="content-preview"
+                            />
+                          </td>
                           <td>{ratingUser?.username || 'Unknown'}</td>
                           <td className="prompt-cell">
-                            {content?.original_prompt || 'N/A'}
+                            {r.original_prompt || 'N/A'}
                           </td>
                           <td>
-                            <span className={`direction-badge direction-${r.direction}`}>
-                              {r.direction === 'right' && '👍 Like'}
-                              {r.direction === 'left' && '👎 Reject'}
-                              {r.direction === 'up' && '⭐ Superlike'}
-                              {r.direction === 'down' && '🔄 Reroll'}
+                            <span className={`direction-badge ${ratingDisplay.class}`}>
+                              {ratingDisplay.text}
                             </span>
                           </td>
                           <td className="comment-cell">
                             {r.comment || '-'}
                           </td>
-                          <td>{r.latency_ms ? `${r.latency_ms}ms` : '-'}</td>
-                          <td>{formatDate(r.created_at)}</td>
+                          <td>{formatDate(r.rated_at)}</td>
                         </tr>
                       );
                     })}
@@ -361,6 +478,171 @@ function AdminPage() {
           </Card>
         )}
       </div>
+
+      {/* User Details Modal */}
+      {selectedUser && (
+        <div className="modal-overlay" onClick={closeUserModal}>
+          <div className="modal-content user-details-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>👤 User Details</h2>
+              <button className="modal-close" onClick={closeUserModal}>✕</button>
+            </div>
+
+            {loadingDetails ? (
+              <div className="modal-body">
+                <Loading text="Loading user details..." />
+              </div>
+            ) : userDetails ? (
+              <div className="modal-body user-details-content">
+                {/* User Info */}
+                <div className="details-section">
+                  <h3>📋 Basic Information</h3>
+                  <div className="details-grid">
+                    <div className="detail-item">
+                      <span className="detail-label">Username:</span>
+                      <span className="detail-value">{userDetails.user.username}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Email:</span>
+                      <span className="detail-value">{userDetails.user.email}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Full Name:</span>
+                      <span className="detail-value">{userDetails.user.full_name || 'Not provided'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Role:</span>
+                      <span className={`badge ${userDetails.user.role === 'admin' ? 'badge-admin' : 'badge-user'}`}>
+                        {userDetails.user.role}
+                      </span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Created:</span>
+                      <span className="detail-value">{formatDate(userDetails.user.created_at)}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Last Login:</span>
+                      <span className="detail-value">{formatDate(userDetails.user.last_login_at)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Statistics */}
+                <div className="details-section">
+                  <h3>📊 Statistics</h3>
+                  <div className="stats-grid-modal">
+                    <div className="stat-box">
+                      <div className="stat-icon-small">📁</div>
+                      <div className="stat-number">{userDetails.stats.totalProjects}</div>
+                      <div className="stat-name">Projects</div>
+                    </div>
+                    <div className="stat-box">
+                      <div className="stat-icon-small">📂</div>
+                      <div className="stat-number">{userDetails.stats.totalSessions}</div>
+                      <div className="stat-name">Sessions</div>
+                    </div>
+                    <div className="stat-box">
+                      <div className="stat-icon-small">🎨</div>
+                      <div className="stat-number">{userDetails.stats.totalContent}</div>
+                      <div className="stat-name">Content</div>
+                    </div>
+                    <div className="stat-box">
+                      <div className="stat-icon-small">⭐</div>
+                      <div className="stat-number">{userDetails.stats.totalRatings}</div>
+                      <div className="stat-name">Ratings</div>
+                    </div>
+                    <div className="stat-box">
+                      <div className="stat-icon-small">👍</div>
+                      <div className="stat-number">{userDetails.stats.likes}</div>
+                      <div className="stat-name">Likes</div>
+                    </div>
+                    <div className="stat-box">
+                      <div className="stat-icon-small">👎</div>
+                      <div className="stat-number">{userDetails.stats.dislikes}</div>
+                      <div className="stat-name">Dislikes</div>
+                    </div>
+                    <div className="stat-box">
+                      <div className="stat-icon-small">⭐</div>
+                      <div className="stat-number">{userDetails.stats.superlikes}</div>
+                      <div className="stat-name">Superlikes</div>
+                    </div>
+                    <div className="stat-box">
+                      <div className="stat-icon-small">🔄</div>
+                      <div className="stat-number">{userDetails.stats.rerolls}</div>
+                      <div className="stat-name">Rerolls</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Projects */}
+                <div className="details-section">
+                  <h3>📁 Projects ({userDetails.projects.length})</h3>
+                  {userDetails.projects.length === 0 ? (
+                    <p className="empty-text">No projects yet</p>
+                  ) : (
+                    <div className="projects-list-modal">
+                      {userDetails.projects.slice(0, 5).map(project => (
+                        <div key={project.id} className="project-item-modal">
+                          <div className="project-info-modal">
+                            <span className="project-tag-modal">{project.tag}</span>
+                            <strong>{project.name}</strong>
+                            {project.description && (
+                              <p className="project-desc-modal">{project.description}</p>
+                            )}
+                          </div>
+                          <div className="project-date-modal">
+                            {new Date(project.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                      ))}
+                      {userDetails.projects.length > 5 && (
+                        <p className="more-text">...and {userDetails.projects.length - 5} more</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Recent Activity */}
+                <div className="details-section">
+                  <h3>🎨 Recent Content ({userDetails.recentContent.length})</h3>
+                  {userDetails.recentContent.length === 0 ? (
+                    <p className="empty-text">No content generated yet</p>
+                  ) : (
+                    <div className="content-grid-modal">
+                      {userDetails.recentContent.slice(0, 8).map(content => {
+                        const getRatingEmoji = (rating) => {
+                          if (rating === 3) return '⭐';
+                          if (rating === 1) return '👍';
+                          if (rating === -1) return '👎';
+                          if (rating === -3) return '🔄';
+                          return '⚪';
+                        };
+                        return (
+                          <div key={content.id} className="content-item-modal">
+                            <img 
+                              src={content.url} 
+                              alt="content" 
+                              className="content-image-modal"
+                            />
+                            <div className="content-stats-modal">
+                              <span>{getRatingEmoji(content.rating)}</span>
+                              <span>{content.rated_at ? new Date(content.rated_at).toLocaleDateString() : 'Not rated'}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="modal-body">
+                <p className="empty-message">Failed to load user details</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
