@@ -22,7 +22,7 @@ export const MODELS_CONFIG = {
     'nano-banana-pro': {
       name: 'Nano Banana Pro',
       description: 'Google\'s SOTA image generation with Gemini 3 Pro',
-      price: '$0.025',
+      price: '$0.15',
       speed: 'Швидко (~45 сек)',
       provider: 'replicate',
       replicateId: 'google/nano-banana-pro',

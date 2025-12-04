@@ -1,6 +1,6 @@
 import express from 'express';
 import contentRoutes from './content.routes.js';
-import ratingsRoutes from './ratings.routes.js';
+// import ratingsRoutes from './ratings.routes.js'; // LEGACY - removed, using session_ratings now
 import insightsRoutes from './insights.routes.js';
 import authRoutes from './auth.routes.js';
 import adminRoutes from './admin.routes.js';
@@ -31,7 +31,7 @@ router.use('/qa', qaRoutes);
 
 // V2 Routes (legacy support)
 router.use('/content', contentRoutes);
-router.use('/ratings', ratingsRoutes);
+// router.use('/ratings', ratingsRoutes); // LEGACY - removed, using session_ratings now
 router.use('/insights', insightsRoutes);
 router.use('/auth', authRoutes);
 router.use('/admin', adminRoutes);

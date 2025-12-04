@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/Tin_UI_V3/static/css/main.f19c0506.css",
-    "main.js": "/Tin_UI_V3/static/js/main.69a8c01e.js",
+    "main.css": "/Tin_UI_V3/static/css/main.09e26ec4.css",
+    "main.js": "/Tin_UI_V3/static/js/main.2b19ecc7.js",
     "index.html": "/Tin_UI_V3/index.html",
-    "main.f19c0506.css.map": "/Tin_UI_V3/static/css/main.f19c0506.css.map",
-    "main.69a8c01e.js.map": "/Tin_UI_V3/static/js/main.69a8c01e.js.map"
+    "main.09e26ec4.css.map": "/Tin_UI_V3/static/css/main.09e26ec4.css.map",
+    "main.2b19ecc7.js.map": "/Tin_UI_V3/static/js/main.2b19ecc7.js.map"
   },
   "entrypoints": [
-    "static/css/main.f19c0506.css",
-    "static/js/main.69a8c01e.js"
+    "static/css/main.09e26ec4.css",
+    "static/js/main.2b19ecc7.js"
   ]
 }
