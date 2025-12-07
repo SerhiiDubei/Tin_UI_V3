@@ -174,35 +174,60 @@ router.post('/', async (req, res) => {
     
     console.log('✅ Session created:', session.id);
     
-    // Create parameters dynamically
-    console.log('🤖 Creating parameters for category:', category);
-    const parametersResult = await createParametersForCategory(category, userPrompt || 'default');
+    // 🎯 For DATING projects: Create fixed parameters (11 parameters)
+    // 🎨 For GENERAL projects: Parameters will be created dynamically on first generation
+    //    based on user's first prompt/photos (Vision AI analysis)
     
-    if (!parametersResult.success) {
-      throw new Error('Failed to create parameters: ' + parametersResult.error);
-    }
-    
-    const parameters = parametersResult.parameters;
-    
-    // Initialize weights (inherits from previous sessions or starts at 100)
-    console.log('⚖️ Initializing weights...');
-    const weightsResult = await initializeSessionWeights(session.id, projectId, parameters);
-    
-    if (!weightsResult.success) {
-      throw new Error('Failed to initialize weights: ' + weightsResult.error);
-    }
-    
-    console.log('✅ Session fully initialized with parameters and weights');
-    
-    res.json({
-      success: true,
-      data: {
-        session,
-        parameters: parametersResult.parameters,
-        parametersMetadata: parametersResult.metadata,
-        weightsInitialized: weightsResult.weightsCount
+    if (category === 'dating') {
+      console.log('💝 Dating project: Creating fixed 11 parameters...');
+      
+      // Create parameters dynamically
+      const parametersResult = await createParametersForCategory(category, userPrompt || 'default');
+      
+      if (!parametersResult.success) {
+        throw new Error('Failed to create parameters: ' + parametersResult.error);
       }
-    });
+      
+      const parameters = parametersResult.parameters;
+      
+      // Initialize weights (inherits from previous sessions or starts at 100)
+      console.log('⚖️ Initializing weights...');
+      const weightsResult = await initializeSessionWeights(session.id, projectId, parameters);
+      
+      if (!weightsResult.success) {
+        throw new Error('Failed to initialize weights: ' + weightsResult.error);
+      }
+      
+      console.log('✅ Session fully initialized with parameters and weights');
+      
+      res.json({
+        success: true,
+        data: {
+          session,
+          parameters: parametersResult.parameters,
+          parametersMetadata: parametersResult.metadata,
+          weightsInitialized: weightsResult.weightsCount
+        }
+      });
+      
+    } else {
+      // General projects: Skip parameter creation
+      console.log('🎨 General project: Parameters will be created on first generation');
+      console.log('   📸 Based on: First prompt + uploaded photos (if any)');
+      
+      res.json({
+        success: true,
+        data: {
+          session,
+          parameters: null, // Will be created dynamically
+          parametersMetadata: {
+            category: 'general',
+            note: 'Parameters will be generated dynamically based on first user input'
+          },
+          weightsInitialized: 0
+        }
+      });
+    }
     
   } catch (error) {
     console.error('❌ Create session error:', error);

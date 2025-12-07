@@ -1,26 +1,53 @@
 import React, { useState } from 'react';
+import ModeSelector from '../ModeSelector';
 import './PhotoUploadModal.css';
 
 /**
- * Photo Upload Modal for AI Analysis
- * Upload up to 20 photos → AI analyzes them → generates a prompt
- * Photos are NOT saved to database (temporary analysis only)
+ * 📸 Photo Upload Modal - Universal
+ * 
+ * For DATING projects:
+ *   - Upload photos → Vision AI analysis → Generate prompt
+ * 
+ * For GENERAL projects:
+ *   - Select Generation Mode (8 modes)
+ *   - Upload reference images (if needed for mode)
+ *   - Set mode-specific options
  */
-const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'general' }) => {
+const PhotoUploadModal = ({ 
+  isOpen, 
+  onClose, 
+  onPromptGenerated, 
+  agentType = 'general',
+  onModeDataReady // New callback for General AI (mode + reference images)
+}) => {
+  // All hooks MUST be before any conditional return
   const [photos, setPhotos] = useState([]);
   const [userInstructions, setUserInstructions] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [selectedMode, setSelectedMode] = useState('style-transfer'); // Default to first reference-based mode
+  const [isDragging, setIsDragging] = useState(false);
 
   if (!isOpen) return null;
+  
+  // Check max photos based on mode
+  const getMaxPhotos = () => {
+    if (agentType === 'dating') return 20;
+    if (['multi-reference', 'ad-replicator'].includes(selectedMode)) return 14;
+    if (['style-transfer', 'image-editing', 'object-replace', 'background-change'].includes(selectedMode)) return 1;
+    return 0; // text-to-image, pro-quality don't need photos
+  };
+  
+  const maxPhotos = getMaxPhotos();
+  const needsPhotos = maxPhotos > 0;
 
   // Convert files to base64 data URLs
   const handleFileSelect = async (event) => {
     const files = Array.from(event.target.files);
     
-    if (photos.length + files.length > 20) {
-      setError('Maximum 20 photos allowed');
+    if (photos.length + files.length > maxPhotos) {
+      setError(`Maximum ${maxPhotos} photos allowed for this mode`);
       return;
     }
 
@@ -125,53 +152,115 @@ const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'gen
       p.id === id ? { ...p, comment } : p
     ));
   };
-
-  const handleAnalyze = async () => {
-    if (photos.length === 0) {
-      setError('Please upload at least one photo');
+  
+  // Drag & Drop handlers
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+  
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+  
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    
+    if (files.length === 0) {
+      setError('Please drop only image files');
       return;
     }
-
-    setAnalyzing(true);
-    setError(null);
-
-    try {
-      // Import API service
-      const { visionAPI } = await import('../../services/api-v3.js');
-      
-      // Build photos array with comments
-      const photosData = photos.map((p, index) => ({
-        url: p.dataUrl,
-        comment: p.comment || '',
-        index: index + 1
-      }));
-
-      console.log('🔍 Analyzing', photos.length, 'photos...');
-      console.log('📝 Photo comments:', photosData.map(p => `${p.index}: ${p.comment || 'none'}`));
-      
-      const response = await visionAPI.analyzePhotos(
-        photosData,
-        userInstructions,
-        agentType
-      );
-
-      if (response.success) {
-        console.log('✅ Analysis complete!');
-        console.log('Generated prompt:', response.data.prompt);
-        
-        // Pass generated prompt to parent component
-        onPromptGenerated(response.data.prompt, response.data);
-        
-        // Close modal
-        handleClose();
-      } else {
-        throw new Error(response.error || 'Analysis failed');
+    
+    // Simulate file input event
+    const mockEvent = {
+      target: {
+        files: files
       }
-    } catch (err) {
-      console.error('Analysis error:', err);
-      setError(err.message || 'Failed to analyze photos');
-    } finally {
-      setAnalyzing(false);
+    };
+    
+    await handleFileSelect(mockEvent);
+  };
+
+  const handleAnalyze = async () => {
+    if (agentType === 'dating') {
+      // DATING: Vision AI Analysis
+      if (photos.length === 0) {
+        setError('Please upload at least one photo');
+        return;
+      }
+
+      setAnalyzing(true);
+      setError(null);
+
+      try {
+        // Import API service
+        const { visionAPI } = await import('../../services/api-v3.js');
+        
+        // Build photos array with comments
+        const photosData = photos.map((p, index) => ({
+          url: p.dataUrl,
+          comment: p.comment || '',
+          index: index + 1
+        }));
+
+        console.log('🔍 Analyzing', photos.length, 'photos...');
+        console.log('📝 Photo comments:', photosData.map(p => `${p.index}: ${p.comment || 'none'}`));
+        
+        const response = await visionAPI.analyzePhotos(
+          photosData,
+          userInstructions,
+          agentType
+        );
+
+        if (response.success) {
+          console.log('✅ Analysis complete!');
+          console.log('Generated prompt:', response.data.prompt);
+          
+          // Pass generated prompt to parent component
+          onPromptGenerated(response.data.prompt, response.data);
+          
+          // Close modal
+          handleClose();
+        } else {
+          throw new Error(response.error || 'Analysis failed');
+        }
+      } catch (err) {
+        console.error('Analysis error:', err);
+        setError(err.message || 'Failed to analyze photos');
+      } finally {
+        setAnalyzing(false);
+      }
+    } else {
+      // GENERAL: Pass mode + photos to parent
+      if (needsPhotos && photos.length === 0) {
+        setError(`This mode requires ${maxPhotos === 1 ? '1 reference image' : `${maxPhotos} reference images`}`);
+        return;
+      }
+      
+      console.log('✅ General AI mode ready:', selectedMode);
+      console.log('📸 Reference images:', photos.length);
+      
+      // Pass data to parent
+      onModeDataReady?.({
+        mode: selectedMode,
+        referenceImages: photos,
+        instructions: userInstructions
+      });
+      
+      // Close modal
+      handleClose();
     }
   };
 
@@ -187,7 +276,11 @@ const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'gen
     <div className="photo-upload-modal-overlay" onClick={handleClose}>
       <div className="photo-upload-modal" onClick={(e) => e.stopPropagation()}>
         <div className="photo-upload-modal-header">
-          <h2>📸 Upload Photos for AI Analysis</h2>
+          <h2>
+            {agentType === 'dating' 
+              ? '📸 Upload Photos for AI Analysis' 
+              : '🎨 Generation Setup'}
+          </h2>
           <button className="close-button" onClick={handleClose}>✕</button>
         </div>
 
@@ -198,31 +291,66 @@ const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'gen
             </div>
           )}
 
-          {/* Upload Area */}
-          <div className="upload-area">
-            <input
-              type="file"
-              id="photo-upload-input"
-              multiple
-              accept="image/*"
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-              disabled={analyzing || photos.length >= 20}
-            />
-            <label 
-              htmlFor="photo-upload-input" 
-              className={`upload-label ${photos.length >= 20 ? 'disabled' : ''}`}
-            >
-              <div className="upload-icon">📤</div>
-              <div className="upload-text">
-                Click to upload photos
-                <br />
-                <span className="upload-hint">
-                  {photos.length}/20 photos · Max 15MB per file
-                </span>
+          {/* GENERAL AI: Mode Selector */}
+          {agentType !== 'dating' && (
+            <div className="mode-selector-section">
+              <label className="section-label">📋 Select Generation Mode:</label>
+              <ModeSelector 
+                selectedMode={selectedMode}
+                onModeChange={setSelectedMode}
+                disabled={analyzing}
+                filterMode="reference-only"
+              />
+            </div>
+          )}
+
+          {/* Upload Area (shown only if mode needs photos OR dating) */}
+          {(agentType === 'dating' || needsPhotos) && (
+            <div className="upload-section">
+              {agentType !== 'dating' && (
+                <label className="section-label">
+                  📸 {maxPhotos === 1 ? 'Upload Reference Image:' : `Upload Reference Images (up to ${maxPhotos}):`}
+                </label>
+              )}
+              
+              <div 
+                className={`upload-area ${isDragging ? 'dragging' : ''}`}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+              >
+                <input
+                  type="file"
+                  id="photo-upload-input"
+                  multiple={maxPhotos > 1}
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                  disabled={analyzing || photos.length >= maxPhotos}
+                />
+                <label 
+                  htmlFor="photo-upload-input" 
+                  className={`upload-label ${photos.length >= maxPhotos ? 'disabled' : ''}`}
+                >
+                  <div className="upload-icon">{isDragging ? '⬇️' : '📤'}</div>
+                  <div className="upload-text">
+                    {isDragging 
+                      ? 'Drop images here!' 
+                      : agentType === 'dating' 
+                        ? 'Click to upload or drag & drop photos' 
+                        : maxPhotos === 1 
+                          ? 'Click to upload or drag & drop image'
+                          : 'Click to upload or drag & drop images'}
+                    <br />
+                    <span className="upload-hint">
+                      {photos.length}/{maxPhotos} {maxPhotos === 1 ? 'image' : 'images'} · Max 15MB per file
+                    </span>
+                  </div>
+                </label>
               </div>
-            </label>
-          </div>
+            </div>
+          )}
 
           {/* Progress */}
           {progress.total > 0 && (
@@ -285,7 +413,7 @@ const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'gen
           {/* Agent Type Info */}
           <div className="agent-info">
             <span className="agent-badge">
-              {agentType === 'dating' ? '💝 Dating Style Analysis' : '🎨 General Style Analysis'}
+              {agentType === 'dating' ? '💝 Dating Style Analysis' : `🎨 Mode: ${selectedMode}`}
             </span>
           </div>
         </div>
@@ -301,9 +429,19 @@ const PhotoUploadModal = ({ isOpen, onClose, onPromptGenerated, agentType = 'gen
           <button
             className="btn-primary"
             onClick={handleAnalyze}
-            disabled={photos.length === 0 || analyzing}
+            disabled={
+              (agentType === 'dating' && photos.length === 0) ||
+              (agentType !== 'dating' && needsPhotos && photos.length === 0) ||
+              analyzing
+            }
           >
-            {analyzing ? '🔍 Analyzing...' : `🚀 Analyze ${photos.length} ${photos.length === 1 ? 'Photo' : 'Photos'}`}
+            {analyzing 
+              ? '🔍 Analyzing...' 
+              : agentType === 'dating'
+                ? `🚀 Analyze ${photos.length} ${photos.length === 1 ? 'Photo' : 'Photos'}`
+                : needsPhotos && photos.length === 0
+                  ? `Upload ${maxPhotos === 1 ? 'Image' : 'Images'} Required`
+                  : '✅ Ready to Generate'}
           </button>
         </div>
       </div>

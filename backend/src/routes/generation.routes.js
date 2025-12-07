@@ -2,6 +2,12 @@ import express from 'express';
 import { supabase } from '../db/supabase.js';
 import { selectParametersWeighted, updateWeightsInstantly } from '../services/weights.service.js';
 import { buildPromptFromParameters } from '../services/agent.service.js';
+import { buildPromptHybrid } from '../services/agent-hybrid.service.js';
+import agentGeneral from '../services/agent-general.service.js';
+import agentAdReplicator from '../services/agent-ad-replicator.service.js';
+
+const { buildPromptGeneral } = agentGeneral;
+const { buildAdCreatives } = agentAdReplicator;
 import { generateImage as generateImageReplicate } from '../services/replicate.service.js';
 import { generateImage as generateImageGenSpark } from '../services/genspark.service.js';
 import { MODELS_CONFIG, getModelsForType } from '../config/models.js';
@@ -61,7 +67,9 @@ router.post('/generate', async (req, res) => {
       userPrompt, 
       count = 1,
       model = 'seedream-4',
-      enableQA = false  // Optional QA validation
+      enableQA = false,  // Optional QA validation
+      mode = 'text-to-image',  // 🎨 General AI mode
+      modeInputs = {}  // 🎨 General AI mode inputs (reference images, etc.)
     } = req.body;
     
     if (!sessionId || !projectId || !userId || !userPrompt) {
@@ -113,23 +121,40 @@ router.post('/generate', async (req, res) => {
     
     if (weightsError) throw weightsError;
     
+    // 🎯 PARAMETERS HANDLING:
+    // - Dating: Parameters exist (11 fixed params created on session creation)
+    // - General: Parameters created dynamically on first generation
+    
+    let parameters = {};
+    
     if (!weights || weights.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Session has no parameters. Was it created properly?'
-      });
-    }
-    
-    // Group parameters
-    const parameters = {};
-    for (const w of weights) {
-      if (!parameters[w.parameter_name]) {
-        parameters[w.parameter_name] = [];
+      if (agentType === 'dating') {
+        // Dating projects MUST have parameters
+        return res.status(400).json({
+          success: false,
+          error: 'Dating session has no parameters. Was it created properly?'
+        });
+      } else {
+        // General projects: Create parameters dynamically on first generation
+        console.log('🎨 General project: Creating parameters dynamically...');
+        console.log('   TODO: Implement dynamic parameter creation based on:');
+        console.log('   - User prompt:', userPrompt);
+        console.log('   - Mode:', mode);
+        console.log('   - Reference images:', modeInputs?.referenceImages?.length || 0);
+        
+        // For now, use empty parameters (General AI doesn't need weighted learning yet)
+        parameters = { mode: mode || 'text-to-image' };
       }
-      parameters[w.parameter_name].push(w.sub_parameter);
+    } else {
+      // Group existing parameters (dating format)
+      for (const w of weights) {
+        if (!parameters[w.parameter_name]) {
+          parameters[w.parameter_name] = [];
+        }
+        parameters[w.parameter_name].push(w.sub_parameter);
+      }
+      console.log('⚖️  Session has', Object.keys(parameters).length, 'parameter categories');
     }
-    
-    console.log('⚖️  Session has', Object.keys(parameters).length, 'parameter categories');
     
     // 🚀 PARALLEL GENERATION - Generate all items simultaneously
     console.log(`\n🔥 Starting PARALLEL generation of ${count} items...`);
@@ -155,14 +180,73 @@ router.post('/generate', async (req, res) => {
             
             console.log(`✅ [${itemNumber}/${count}] Parameters selected:`, Object.keys(selectedParams).length);
             
-            // Step 2: Build prompt with agent
-            const promptResult = await buildPromptFromParameters(
-              userPrompt,
-              selectedParams,
-              agentType,
-              category,
-              sessionId  // 🔥 Pass sessionId for comments loading
-            );
+            // Step 2: Build prompt with agent (🎨 Agent Selection)
+            let promptResult;
+            
+            if (agentType === 'dating') {
+              // 💝 Dating Photo Expert (existing agent)
+              console.log(`🎨 Using Dating Photo Expert (Hybrid)`);
+              promptResult = await buildPromptHybrid(
+                userPrompt,
+                agentType,
+                category,
+                sessionId
+              );
+            } else if (mode === 'ad-replicator') {
+              // 🎯 Ad Creative Replicator (special mode)
+              console.log(`🎯 Using Ad Creative Replicator`);
+              console.log(`   Reference Images: ${modeInputs.reference_images?.length || 0}`);
+              
+              // Ad Replicator returns MULTIPLE variations, not single prompt
+              // We'll handle this specially
+              const adResult = await buildAdCreatives(
+                userPrompt,
+                modeInputs.reference_images || [],
+                {
+                  niche: modeInputs.niche,
+                  targetAudience: modeInputs.target_audience,
+                  platform: modeInputs.platform,
+                  variations: count  // Use count as number of variations
+                }
+              );
+              
+              if (!adResult.success) {
+                throw new Error('Ad Replicator failed: ' + adResult.error);
+              }
+              
+              // For ad-replicator, we'll generate ONE image per iteration
+              // and use the variation's prompt
+              const variationIndex = (itemNumber - 1) % adResult.variations.length;
+              const variation = adResult.variations[variationIndex];
+              
+              promptResult = {
+                success: true,
+                prompt: variation.prompt,
+                originalPrompt: userPrompt,
+                parameters: {
+                  mode: 'ad-replicator',
+                  creative_type: variation.creative_type,
+                  strategy_notes: variation.strategy_notes,
+                  ...variation.technical_params
+                },
+                metadata: {
+                  approach: 'ad-replicator',
+                  variationId: variation.creative_id,
+                  analysisSummary: adResult.analysisSummary,
+                  ...adResult.metadata
+                }
+              };
+              
+            } else {
+              // 🎨 General Purpose AI (other modes)
+              console.log(`🎨 Using General Purpose AI (Mode: ${mode})`);
+              promptResult = await buildPromptGeneral(
+                userPrompt,
+                mode,
+                modeInputs,
+                sessionId
+              );
+            }
             
             if (!promptResult.success) {
               throw new Error('Failed to build prompt: ' + promptResult.error);
@@ -198,10 +282,19 @@ router.post('/generate', async (req, res) => {
             // Step 3: Generate image
             console.log(`🎨 [${itemNumber}/${count}] Generating image with`, model);
             
+            // Build generation options
+            const generationOptions = { modelKey: model };
+            
+            // 📸 Add image URLs if provided (for General AI modes)
+            if (promptResult.parameters?.image_urls && promptResult.parameters.image_urls.length > 0) {
+              generationOptions.image_urls = promptResult.parameters.image_urls;
+              console.log(`📸 [${itemNumber}/${count}] Using ${promptResult.parameters.image_urls.length} reference images`);
+            }
+            
             // All models now use Replicate (including nano-banana-pro)
             const generationResult = await generateImageReplicate(
               enhancedPrompt,
-              { modelKey: model },
+              generationOptions,
               userId
             );
             

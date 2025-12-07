@@ -9,11 +9,12 @@ export const supabase = createClient(
 // Test connection
 export async function testConnection() {
   try {
+    // Test connection using users table (always exists)
     const { data, error } = await supabase
-      .from('prompt_templates')
+      .from('users')
       .select('count')
       .limit(1);
-    
+
     if (error) throw error;
     
     console.log('✅ Supabase connection successful');

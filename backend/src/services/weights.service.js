@@ -176,9 +176,21 @@ export async function initializeSessionWeights(sessionId, projectId, parameters)
       console.log('🆕 First session in project, starting with default weights (100)');
       
       // Initialize all parameters with weight 100
-      for (const [paramName, options] of Object.entries(parameters)) {
-        for (const option of options) {
-          baseWeights[`${paramName}.${option}`] = 100.0;
+      // Check if parameters is object with options (dating) or different format (general)
+      if (parameters && typeof parameters === 'object') {
+        for (const [paramName, options] of Object.entries(parameters)) {
+          // Skip metadata
+          if (paramName === 'metadata') continue;
+          
+          // If options is array (dating parameters)
+          if (Array.isArray(options)) {
+            for (const option of options) {
+              baseWeights[`${paramName}.${option}`] = 100.0;
+            }
+          } else {
+            // For general mode or single value parameters
+            baseWeights[paramName] = 100.0;
+          }
         }
       }
     }
@@ -186,7 +198,10 @@ export async function initializeSessionWeights(sessionId, projectId, parameters)
     // Save weights to database (FIXED for this session)
     const weightRecords = [];
     for (const [key, weight] of Object.entries(baseWeights)) {
-      const [paramName, subParam] = key.split('.');
+      const parts = key.split('.');
+      const paramName = parts[0];
+      const subParam = parts.length > 1 ? parts[1] : null;
+      
       weightRecords.push({
         session_id: sessionId,
         category: (parameters.metadata && parameters.metadata.category) || 'general',

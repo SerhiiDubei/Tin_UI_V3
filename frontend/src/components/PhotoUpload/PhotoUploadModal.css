@@ -78,6 +78,16 @@
 
 .upload-area {
   margin-bottom: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.upload-area.dragging {
+  transform: scale(1.02);
+}
+
+.upload-area.dragging .upload-label {
+  border-color: #667eea;
+  background: #f0f4ff;
 }
 
 .upload-label {
@@ -357,6 +367,27 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Mode Selector Section */
+.mode-selector-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 2px solid #e0e0e0;
+}
+
+.section-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #333;
+  margin-bottom: 0.75rem;
+}
+
+.upload-section {
+  margin-top: 1rem;
 }
 
 @media (max-width: 768px) {

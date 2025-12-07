@@ -192,9 +192,59 @@ SELECT * FROM session_ratings WHERE content_id = 'some-id';
 
 ## 🎓 Summary
 
-1. **`content_v3`** = Контент + швидкий rating
+### **Core Tables:**
+1. **`content_v3`** = Контент + швидкий rating + weights_used
 2. **`session_ratings`** = Детальні рейтинги + параметри для AI навчання 🧠
-3. **`ratings`** = Стара таблиця, можна видалити
-4. **`weight_parameters`** = Поточні ваги параметрів
+3. **`weight_parameters`** = Поточні ваги параметрів (динамічні)
+4. **`agent_configs`** = AI агенти (Dating Expert + General Purpose AI)
+5. **`projects`** + **`sessions`** = Організаційна структура
 
-**Агент вчиться:** `session_ratings.parameters_used` + `rating` → оновлює `weight_parameters` → краща наступна генерація! 🚀
+### **Legacy (можна видалити):**
+- ⚠️ **`ratings`** = Стара таблиця (SwipePage V1)
+- ⚠️ **`prompt_templates`** = Старі статичні шаблони (V2)
+
+### **AI Agents:**
+
+**1. Dating Photo Expert** (tag: 'dating')
+- 11-Parameter System (smartphone_style, subject, lighting, etc.)
+- Weighted Learning з session_ratings
+- MASTER PROMPT для smartphone realism
+- Authenticity through Imperfection
+
+**2. General Purpose AI** (tag: any other)
+- 8 Specialized Modes (text-to-image, style transfer, editing, multi-ref, etc.)
+- Multi-model support (Nano Banana Pro, Seedream, Flux)
+- Reference images (up to 14)
+- Ad Replicator для affiliate marketing
+
+### **Learning Flow:**
+```
+session_ratings.parameters_used + rating 
+   → weights.service.js analyzes
+   → updates weight_parameters
+   → next generation uses new weights! 🚀
+```
+
+---
+
+## 🗄️ Database Status
+
+**Active Tables:** ✅
+- content_v3 (141+ items)
+- session_ratings (335+ records)
+- weight_parameters (dynamic)
+- agent_configs (2 agents)
+- projects, sessions, users
+
+**Legacy Tables:** ⚠️
+- ratings (optional cleanup)
+- prompt_templates (optional cleanup)
+
+**SQL Scripts:**
+- `UPDATE_GENERAL_AGENT.sql` - Update General AI agent
+- `REMOVE_LEGACY_TABLES.sql` - Optional cleanup
+
+---
+
+**✅ Database готова для роботи!**
+

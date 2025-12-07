@@ -79,6 +79,10 @@ function GeneratePageV3() {
   const [showPhotoUploadModal, setShowPhotoUploadModal] = useState(false);
   const [generatedPromptData, setGeneratedPromptData] = useState(null);
   
+  // 🎨 General AI mode state
+  const [generationMode, setGenerationMode] = useState('text-to-image');
+  const [referenceImages, setReferenceImages] = useState([]);
+  
   // Swipe state
   const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
   const [touchEnd, setTouchEnd] = useState({ x: 0, y: 0 });
@@ -87,6 +91,10 @@ function GeneratePageV3() {
   
   const { projectId, sessionId } = useParams();
   const navigate = useNavigate();
+  
+  // 🔥 Determine agent type based on project tag
+  const agentType = project?.tag === 'dating' ? 'dating' : 'general';
+  const isGeneralMode = agentType === 'general';
 
   const checkUnratedContent = useCallback(async () => {
     try {
@@ -139,15 +147,36 @@ function GeneratePageV3() {
     try {
       // 🚀 PARALLEL GENERATION: одночасна генерація всіх зображень
       console.log(`🔥 Starting PARALLEL generation of ${count} images...`);
+      console.log(`🎯 Agent Type: ${agentType}`);
+      if (isGeneralMode) {
+        console.log(`🎨 Mode: ${generationMode}`);
+        console.log(`📸 Reference Images: ${referenceImages.length}`);
+      }
       
-      const response = await generationAPI.generate({
+      // Build generation request
+      const generationRequest = {
         sessionId: sessionId,
         projectId: projectId,
         userId: user.id,
         userPrompt: prompt,
-        count: count,              // 🔥 Всі одразу!
+        count: count,
         model: selectedModel
-      });
+      };
+      
+      // 🎨 Add General AI mode data if applicable
+      if (isGeneralMode) {
+        generationRequest.mode = generationMode;
+        generationRequest.modeInputs = {};
+        
+        // Add reference images if any
+        if (referenceImages.length > 0) {
+          // TODO: Upload images to storage and get URLs
+          // For now, use data URLs directly (not recommended for production)
+          generationRequest.modeInputs.reference_images = referenceImages.map(img => img.dataUrl || img.preview);
+        }
+      }
+      
+      const response = await generationAPI.generate(generationRequest);
 
       console.log('📦 Received generation response:', response);
 
@@ -318,6 +347,29 @@ function GeneratePageV3() {
     
     // Show success message
     alert('✅ Prompt згенеровано з ваших фото! Тепер можете запустити генерацію.');
+  };
+  
+  // Handle General AI mode data from modal
+  const handleModeDataReady = (data) => {
+    console.log('✅ General AI mode data ready:', data);
+    
+    // Set mode and reference images
+    setGenerationMode(data.mode);
+    setReferenceImages(data.referenceImages || []);
+    
+    // If there are instructions, prepend to prompt
+    if (data.instructions) {
+      setPrompt(data.instructions);
+    }
+    
+    // Close modal
+    setShowPhotoUploadModal(false);
+    
+    // Show success message
+    const needsPhotos = ['style-transfer', 'image-editing', 'multi-reference', 'object-replace', 'background-change', 'ad-replicator'].includes(data.mode);
+    if (needsPhotos && data.referenceImages && data.referenceImages.length > 0) {
+      alert(`✅ Mode: ${data.mode} | ${data.referenceImages.length} reference image(s) ready!`);
+    }
   };
 
   const handleResumeRating = async () => {
@@ -628,10 +680,80 @@ function GeneratePageV3() {
                   📸 Upload Photos
                 </button>
               </div>
+              
+              {/* 🎨 General AI: Show selected mode & reference images summary */}
+              {isGeneralMode && (generationMode !== 'text-to-image' || referenceImages.length > 0) && (
+                <div className="mode-summary" style={{ 
+                  marginTop: '1rem', 
+                  padding: '0.75rem', 
+                  background: '#f5f5f5', 
+                  borderRadius: '8px',
+                  display: 'flex',
+                  gap: '1rem',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <strong>🎨 Mode:</strong> {generationMode}
+                  </div>
+                  {referenceImages.length > 0 && (
+                    <div style={{ flex: 1 }}>
+                      <strong>📸 References:</strong> {referenceImages.length} image(s)
+                      <button
+                        onClick={() => setReferenceImages([])}
+                        style={{
+                          marginLeft: '0.5rem',
+                          padding: '0.25rem 0.5rem',
+                          background: '#ff4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem'
+                        }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    onClick={handlePhotoUpload}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: '#667eea',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem'
+                    }}
+                  >
+                    ⚙️ Change Mode
+                  </button>
+                </div>
+              )}
+              
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder={`Опишіть що ви хочете згенерувати...
+                placeholder={isGeneralMode 
+                  ? (generationMode === 'ad-replicator' 
+                    ? `Describe your niche and offer...
+
+Example: "Teeth whitening kit for women 30-50"
+Example: "Bathroom remodel service - walk-in showers"
+Example: "Weight loss supplement - 30-day transformation"
+Example: "Car detailing service - ceramic coating"
+
+Upload 1-14 competitor ads above, then describe YOUR offer!`
+                    : `Describe what you want based on selected mode...
+
+Example for Text-to-Image: "Modern office with plants"
+Example for Style Transfer: "Portrait in the same style"
+Example for Image Editing: "Enhance colors, fix lighting"
+Example for Multi-Reference: "Combine character from image 1 with scene from image 2"
+
+Select mode above and upload images if needed!`)
+                  : `Опишіть що ви хочете згенерувати...
 
 Приклад для Dating: "Beautiful woman on the beach at sunset"
 Приклад для Cars: "Red sports car on mountain road"
@@ -1096,6 +1218,7 @@ function GeneratePageV3() {
           isOpen={showPhotoUploadModal}
           onClose={() => setShowPhotoUploadModal(false)}
           onPromptGenerated={handlePromptGenerated}
+          onModeDataReady={handleModeDataReady}
           agentType={project?.tag === 'dating' ? 'dating' : 'general'}
         />
 

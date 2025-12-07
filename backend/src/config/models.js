@@ -21,17 +21,31 @@ export const MODELS_CONFIG = {
     },
     'nano-banana-pro': {
       name: 'Nano Banana Pro',
-      description: 'Google\'s SOTA image generation with Gemini 3 Pro',
+      description: 'Ultra-fast AI with 14 reference images support, precision editing, 4K resolution',
       price: '$0.15',
-      speed: 'Швидко (~45 сек)',
+      speed: 'Ultra Fast (~1.2 сек)',
       provider: 'replicate',
       replicateId: 'google/nano-banana-pro',
       version: 'latest',
+      features: [
+        'Up to 14 reference images (6 objects + 5 characters)',
+        'Precision image editing',
+        'Style transfer',
+        'Object replacement',
+        'Background changes',
+        'Up to 4K resolution'
+      ],
       params: {
-        width: 1024,
-        height: 1024,
-        num_inference_steps: 20
-      }
+        width: 2048,  // Increased from 1024 to 2048 (supports up to 4K)
+        height: 2048,
+        num_inference_steps: 20,
+        // Reference images support
+        image_urls: [],  // Array of up to 14 image URLs
+        guidance_scale: 7.5
+      },
+      supportsReferenceImages: true,
+      maxReferenceImages: 14,
+      supportsImageEditing: true
     },
     'flux-schnell': {
       name: 'FLUX Schnell',

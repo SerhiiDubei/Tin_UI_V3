@@ -27,17 +27,19 @@ async function fetchAPI(endpoint, options = {}) {
 }
 
 /**
- * Content API
+ * Content API (LEGACY V2 - for backward compatibility only)
+ * NOTE: Use generationAPI from api-v3.js for new code!
  */
 export const contentAPI = {
-  // Generate new content
-  generate: (prompt, userId, templateId = null, contentType = 'image', modelKey = null, count = 1) => {
+  // Generate new content (LEGACY - V3 uses /api/generation/generate)
+  generate: (prompt, userId, contentType = 'image', modelKey = null, count = 1) => {
+    console.warn('⚠️ contentAPI.generate is LEGACY! Use generationAPI from api-v3.js');
     return fetchAPI('/content/generate', {
       method: 'POST',
       body: JSON.stringify({ 
         prompt, 
         userId, 
-        templateId, 
+        // templateId removed - not used in V3
         contentType, 
         modelKey, 
         count 
