@@ -249,3 +249,4 @@ session_ratings.parameters_used + rating
 **✅ Database готова для роботи!**
 
 
+

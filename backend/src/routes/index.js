@@ -40,3 +40,40 @@ router.use('/admin', adminRoutes);
 
 export default router;
 
+
+  });
+
+});
+
+
+
+// V3 Routes
+
+router.use('/projects', projectsRoutes);
+
+router.use('/sessions', sessionsRoutes);
+
+router.use('/generation', generationRoutes);
+
+router.use('/vision', visionRoutes);
+
+router.use('/qa', qaRoutes);
+
+
+
+// V2 Routes (legacy support)
+
+router.use('/content', contentRoutes);
+
+// router.use('/ratings', ratingsRoutes); // LEGACY - removed, using session_ratings now
+router.use('/insights', insightsRoutes);
+
+router.use('/auth', authRoutes);
+
+router.use('/admin', adminRoutes);
+
+
+
+export default router;
+
+

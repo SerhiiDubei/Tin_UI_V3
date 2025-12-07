@@ -183,3 +183,4 @@ WHERE type = 'general';
 COMMENT ON TABLE agent_configs IS 'AI agents with specialized capabilities - Dating Expert for dating photos, General Multi-Modal for all other content types';
 
 
+

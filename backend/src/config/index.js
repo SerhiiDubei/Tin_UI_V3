@@ -44,7 +44,7 @@ export const config = {
   },
   
   gemini: {
-    apiKey: process.env.GEMINI_API_KEY || 'AIzaSyC4l1mFJNJEqB-i279aifZ3e7tTH_7VD8M'
+    apiKey: process.env.GEMINI_API_KEY
   },
   
   cors: {
