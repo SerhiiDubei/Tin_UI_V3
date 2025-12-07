@@ -195,6 +195,15 @@ const PhotoUploadModal = ({
   };
 
   const handleAnalyze = async () => {
+    console.log('========================================');
+    console.log('🚀 handleAnalyze called!');
+    console.log('   - agentType:', agentType);
+    console.log('   - selectedMode:', selectedMode);
+    console.log('   - photos.length:', photos.length);
+    console.log('   - useAIAnalysis:', useAIAnalysis);
+    console.log('   - needsPhotos:', needsPhotos);
+    console.log('========================================');
+    
     // Check if photos required
     if (needsPhotos && photos.length === 0) {
       setError(`Please upload ${maxPhotos === 1 ? '1 reference image' : `${maxPhotos} reference images`}`);
@@ -203,6 +212,7 @@ const PhotoUploadModal = ({
     
     // UNIVERSAL: Vision AI Analysis (for both Dating and General if photos uploaded)
     if (photos.length > 0 && useAIAnalysis) {
+      console.log('✅ CALLING VISION AI...');
       setAnalyzing(true);
       setError(null);
 
@@ -224,7 +234,8 @@ const PhotoUploadModal = ({
         const response = await visionAPI.analyzePhotos(
           photosData,
           userInstructions || `Analyze these images for ${selectedMode} mode`,
-          agentType
+          agentType,
+          selectedMode // Pass mode to backend
         );
 
         if (response.success) {
@@ -258,6 +269,12 @@ const PhotoUploadModal = ({
       }
     } else {
       // GENERAL: No AI analysis - pass mode + photos only
+      console.log('========================================');
+      console.log('⚠️ SKIPPING VISION AI!');
+      console.log('   Reason: photos.length === 0 OR useAIAnalysis === false');
+      console.log('   - photos.length:', photos.length);
+      console.log('   - useAIAnalysis:', useAIAnalysis);
+      console.log('========================================');
       console.log('✅ General AI mode ready (no AI analysis):', selectedMode);
       console.log('📸 Reference images:', photos.length);
       
@@ -401,37 +418,66 @@ const PhotoUploadModal = ({
             </div>
           )}
 
-          {/* AI Analysis Option (General AI only) */}
+          {/* AI Analysis Option (General AI only) - PROMINENT! */}
           {agentType !== 'dating' && photos.length > 0 && (
             <div className="ai-analysis-option" style={{ 
-              marginTop: '1rem', 
-              padding: '1rem', 
-              background: '#f0f4ff', 
-              borderRadius: '8px',
-              border: '1px solid #667eea'
+              marginTop: '1.5rem', 
+              marginBottom: '1.5rem',
+              padding: '1.5rem', 
+              background: useAIAnalysis ? '#e8f5e9' : '#fff3e0',
+              borderRadius: '12px',
+              border: `3px solid ${useAIAnalysis ? '#4caf50' : '#ff9800'}`,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
             }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.75rem', 
+                cursor: 'pointer',
+                fontSize: '1.1rem'
+              }}>
                 <input
                   type="checkbox"
                   checked={useAIAnalysis}
                   onChange={(e) => setUseAIAnalysis(e.target.checked)}
                   disabled={analyzing}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  style={{ 
+                    width: '24px', 
+                    height: '24px', 
+                    cursor: 'pointer',
+                    accentColor: '#4caf50'
+                  }}
                 />
-                <span style={{ fontWeight: 600 }}>
-                  🤖 Analyze photos with Vision AI
+                <span style={{ fontWeight: 700, color: useAIAnalysis ? '#2e7d32' : '#e65100' }}>
+                  {useAIAnalysis ? '✅' : '⚠️'} Аналіз фото з Vision AI
                 </span>
               </label>
               <p style={{ 
-                margin: '0.5rem 0 0 0', 
-                fontSize: '0.85rem', 
-                color: '#555',
-                marginLeft: '1.5rem'
+                margin: '1rem 0 0 0', 
+                fontSize: '0.95rem', 
+                color: '#333',
+                marginLeft: '2rem',
+                lineHeight: '1.5'
               }}>
                 {useAIAnalysis 
-                  ? '✅ AI will describe your photos and generate a prompt automatically'
-                  : '❌ Photos will be used as reference only (you must write prompt manually)'}
+                  ? '✅ AI детально опише ваші фото і автоматично створить промпт для генерації'
+                  : '❌ Фото будуть використані як reference без аналізу. Ви маєте написати промпт вручну!'}
               </p>
+              {!useAIAnalysis && (
+                <div style={{
+                  marginTop: '0.75rem',
+                  marginLeft: '2rem',
+                  padding: '0.75rem',
+                  background: '#fff',
+                  borderRadius: '8px',
+                  border: '2px solid #ff9800',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  color: '#e65100'
+                }}>
+                  ⚠️ УВАГА: Без аналізу AI промпт НЕ буде згенеровано автоматично!
+                </div>
+              )}
             </div>
           )}
 

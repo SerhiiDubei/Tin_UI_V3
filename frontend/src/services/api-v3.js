@@ -208,14 +208,16 @@ export const visionAPI = {
    * @param {string[]} imageUrls - Array of image URLs (1-20)
    * @param {string} userInstructions - Optional user instructions
    * @param {string} agentType - 'dating' or 'general'
+   * @param {string} mode - Generation mode (for General AI)
    */
-  analyzePhotos: async (imageUrls, userInstructions = '', agentType = 'general') => {
+  analyzePhotos: async (imageUrls, userInstructions = '', agentType = 'general', mode = null) => {
     return request('/vision/analyze', {
       method: 'POST',
       body: JSON.stringify({
         imageUrls,
         userInstructions,
-        agentType
+        agentType,
+        mode
       })
     });
   },

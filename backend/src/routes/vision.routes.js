@@ -18,13 +18,14 @@ const router = express.Router();
  */
 router.post('/analyze', async (req, res) => {
   try {
-    const { imageUrls, userInstructions = '', agentType = 'general' } = req.body;
+    const { imageUrls, userInstructions = '', agentType = 'general', mode = null } = req.body;
     
     console.log('\n' + '='.repeat(80));
     console.log('📸 VISION ANALYSIS REQUEST');
     console.log('='.repeat(80));
     console.log('Images:', imageUrls?.length || 0);
     console.log('Agent type:', agentType);
+    console.log('Mode:', mode || 'not specified');
     console.log('Has instructions:', !!userInstructions);
     
     // Validation
@@ -53,7 +54,8 @@ router.post('/analyze', async (req, res) => {
     const result = await analyzePhotosAndGeneratePrompt(
       imageUrls,
       userInstructions,
-      agentType
+      agentType,
+      mode // Pass mode to service
     );
     
     if (!result.success) {

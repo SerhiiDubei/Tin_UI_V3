@@ -14,7 +14,7 @@ const openai = new OpenAI({
  * @param {string} agentType - 'dating' or 'general'
  * @returns {Object} { success, prompt, analysis, error }
  */
-export async function analyzePhotosAndGeneratePrompt(photosData, userInstructions = '', agentType = 'general') {
+export async function analyzePhotosAndGeneratePrompt(photosData, userInstructions = '', agentType = 'general', mode = null) {
   try {
     // Support both old format (array of strings) and new format (array of objects)
     const photos = Array.isArray(photosData) && typeof photosData[0] === 'string'
@@ -26,6 +26,7 @@ export async function analyzePhotosAndGeneratePrompt(photosData, userInstruction
     console.log('='.repeat(80));
     console.log('Photos count:', photos.length);
     console.log('Agent type:', agentType);
+    console.log('Mode:', mode || 'not specified');
     console.log('User instructions:', userInstructions || 'None');
     
     // Log photo comments
@@ -64,7 +65,7 @@ export async function analyzePhotosAndGeneratePrompt(photosData, userInstruction
     const systemPrompt = getAdaptivePrompt(finalCategory, userInstructions);
     
     // 🆕 Build category-specific request
-    const requestText = buildCategoryRequest(detection, userInstructions, photos);
+    const requestText = buildCategoryRequest(detection, userInstructions, photos, agentType, mode);
     
     // Build user message with images
     const userMessage = {
@@ -148,9 +149,9 @@ export async function analyzePhotosAndGeneratePrompt(photosData, userInstruction
 
 /**
  * 🆕 Build category-specific analysis request
- * This adapts based on detected content category
+ * This adapts based on detected content category AND generation mode
  */
-function buildCategoryRequest(detection, userInstructions, photos) {
+function buildCategoryRequest(detection, userInstructions, photos, agentType, mode) {
   const { category, subjects, confidence } = detection;
   
   // Safety context based on category
@@ -185,9 +186,44 @@ function buildCategoryRequest(detection, userInstructions, photos) {
     ? `\n\n⭐ USER INSTRUCTIONS: "${userInstructions}"\n`
     : '';
   
-  // Category-specific task
-  const task = `**YOUR TASK:**
-Analyze these ${photos.length} reference images of "${subjects}" and extract their COMMON VISUAL STYLE.
+  // 🆕 MODE-SPECIFIC TASK
+  let task;
+  const needsDetailedPerPhoto = agentType === 'general' && (
+    mode === 'multi-reference' || 
+    mode === 'ad-replicator' || 
+    photos.length > 1
+  );
+  
+  if (needsDetailedPerPhoto) {
+    // GENERAL AI with multiple references - describe EACH photo separately
+    task = `**YOUR TASK:**
+Analyze these ${photos.length} reference images and provide a DETAILED, STRUCTURED description for AI image generation.
+
+**FORMAT YOUR RESPONSE AS:**
+
+📸 **INDIVIDUAL IMAGE DESCRIPTIONS:**
+Photo 1: [Detailed description of specific elements, subjects, composition, style]
+Photo 2: [Detailed description of specific elements, subjects, composition, style]
+${photos.length > 2 ? `Photo ${photos.length}: [Continue for all photos...]` : ''}
+
+🎨 **COMMON STYLE ELEMENTS:**
+- Visual style: [artistic style, rendering technique]
+- Color palette: [specific colors, tones, mood]
+- Lighting: [lighting setup, mood, shadows]
+- Composition: [framing, perspective, balance]
+- Key characteristics: [unique features that define the style]
+
+🎯 **GENERATION PROMPT:**
+[A single, comprehensive prompt that captures ALL elements above for generating a NEW image in this style]
+
+**REMEMBER:**
+- Be EXTREMELY DETAILED for each photo (colors, subjects, poses, backgrounds, lighting, mood)
+- Include SPECIFIC DIFFERENCES between photos (this helps AI understand variation)
+- The final prompt should guide creating ONE new image that captures the essence of ALL references`;
+  } else {
+    // DATING or single image - unified style description
+    task = `**YOUR TASK:**
+Analyze these ${photos.length} reference ${photos.length === 1 ? 'image' : 'images'} of "${subjects}" and extract their COMMON VISUAL STYLE.
 Generate ONE detailed, cohesive prompt for creating a SINGLE NEW image in this unified style.
 
 **REMEMBER:**
@@ -195,6 +231,7 @@ Generate ONE detailed, cohesive prompt for creating a SINGLE NEW image in this u
 - Be SPECIFIC and DETAILED (especially for ${category})
 - Generate prompt for ONE new image, not a series
 - DO NOT list individual images or create collage descriptions`;
+  }
 
   return `${context}${detectionInfo}${photoComments}${instructions}
 

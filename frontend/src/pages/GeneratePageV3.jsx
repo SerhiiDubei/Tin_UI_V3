@@ -351,7 +351,13 @@ function GeneratePageV3() {
   
   // Handle General AI mode data from modal
   const handleModeDataReady = (data) => {
-    console.log('✅ General AI mode data ready:', data);
+    console.log('========================================');
+    console.log('✅ General AI mode data ready:');
+    console.log('   - mode:', data.mode);
+    console.log('   - referenceImages:', data.referenceImages?.length || 0);
+    console.log('   - generatedPrompt:', data.generatedPrompt ? 'YES ✅' : 'NO ❌');
+    console.log('   - instructions:', data.instructions || 'none');
+    console.log('========================================');
     
     // Set mode and reference images
     setGenerationMode(data.mode);
@@ -360,7 +366,7 @@ function GeneratePageV3() {
     // Priority for prompt: generatedPrompt (AI) > instructions (user) > existing prompt
     if (data.generatedPrompt) {
       // AI generated prompt from Vision AI
-      console.log('🤖 Using AI-generated prompt:', data.generatedPrompt);
+      console.log('🤖 SETTING AI-generated prompt:', data.generatedPrompt);
       setPrompt(data.generatedPrompt);
       
       // Store analysis data
@@ -369,9 +375,14 @@ function GeneratePageV3() {
         analysis: data.analysis,
         timestamp: new Date().toISOString()
       });
+      
+      console.log('✅ Prompt UPDATED in state!');
     } else if (data.instructions) {
       // User instructions
+      console.log('📝 Using user instructions:', data.instructions);
       setPrompt(data.instructions);
+    } else {
+      console.warn('⚠️ NO PROMPT PROVIDED! User must write manually.');
     }
     
     // Close modal
@@ -382,9 +393,9 @@ function GeneratePageV3() {
     const needsPhotos = ['style-transfer', 'image-editing', 'multi-reference', 'object-replace', 'background-change', 'ad-replicator'].includes(data.mode);
     
     if (hasAIPrompt) {
-      alert(`✅ Vision AI analyzed ${data.referenceImages?.length || 0} image(s)!\n\nMode: ${data.mode}\nPrompt generated automatically!`);
+      alert(`✅ Vision AI проаналізував ${data.referenceImages?.length || 0} зображення!\n\nРежим: ${data.mode}\nПромпт згенеровано автоматично!\n\nПеревірте поле "Ваш Prompt" нижче.`);
     } else if (needsPhotos && data.referenceImages && data.referenceImages.length > 0) {
-      alert(`✅ Mode: ${data.mode}\n${data.referenceImages.length} reference image(s) ready!\n\nℹ️ Don't forget to write a prompt!`);
+      alert(`⚠️ Режим: ${data.mode}\n${data.referenceImages.length} зображень завантажено!\n\n❌ Vision AI НЕ викликався (checkbox відключений?)\n\nНапишіть промпт вручну!`);
     }
   };
 
