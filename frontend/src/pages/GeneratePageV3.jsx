@@ -357,8 +357,20 @@ function GeneratePageV3() {
     setGenerationMode(data.mode);
     setReferenceImages(data.referenceImages || []);
     
-    // If there are instructions, prepend to prompt
-    if (data.instructions) {
+    // Priority for prompt: generatedPrompt (AI) > instructions (user) > existing prompt
+    if (data.generatedPrompt) {
+      // AI generated prompt from Vision AI
+      console.log('🤖 Using AI-generated prompt:', data.generatedPrompt);
+      setPrompt(data.generatedPrompt);
+      
+      // Store analysis data
+      setGeneratedPromptData({
+        prompt: data.generatedPrompt,
+        analysis: data.analysis,
+        timestamp: new Date().toISOString()
+      });
+    } else if (data.instructions) {
+      // User instructions
       setPrompt(data.instructions);
     }
     
@@ -366,9 +378,13 @@ function GeneratePageV3() {
     setShowPhotoUploadModal(false);
     
     // Show success message
+    const hasAIPrompt = !!data.generatedPrompt;
     const needsPhotos = ['style-transfer', 'image-editing', 'multi-reference', 'object-replace', 'background-change', 'ad-replicator'].includes(data.mode);
-    if (needsPhotos && data.referenceImages && data.referenceImages.length > 0) {
-      alert(`✅ Mode: ${data.mode} | ${data.referenceImages.length} reference image(s) ready!`);
+    
+    if (hasAIPrompt) {
+      alert(`✅ Vision AI analyzed ${data.referenceImages?.length || 0} image(s)!\n\nMode: ${data.mode}\nPrompt generated automatically!`);
+    } else if (needsPhotos && data.referenceImages && data.referenceImages.length > 0) {
+      alert(`✅ Mode: ${data.mode}\n${data.referenceImages.length} reference image(s) ready!\n\nℹ️ Don't forget to write a prompt!`);
     }
   };
 

@@ -28,6 +28,7 @@ const PhotoUploadModal = ({
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [selectedMode, setSelectedMode] = useState('style-transfer'); // Default to first reference-based mode
   const [isDragging, setIsDragging] = useState(false);
+  const [useAIAnalysis, setUseAIAnalysis] = useState(true); // Auto-analyze photos with Vision AI
 
   if (!isOpen) return null;
   
@@ -194,13 +195,14 @@ const PhotoUploadModal = ({
   };
 
   const handleAnalyze = async () => {
-    if (agentType === 'dating') {
-      // DATING: Vision AI Analysis
-      if (photos.length === 0) {
-        setError('Please upload at least one photo');
-        return;
-      }
-
+    // Check if photos required
+    if (needsPhotos && photos.length === 0) {
+      setError(`Please upload ${maxPhotos === 1 ? '1 reference image' : `${maxPhotos} reference images`}`);
+      return;
+    }
+    
+    // UNIVERSAL: Vision AI Analysis (for both Dating and General if photos uploaded)
+    if (photos.length > 0 && useAIAnalysis) {
       setAnalyzing(true);
       setError(null);
 
@@ -215,21 +217,33 @@ const PhotoUploadModal = ({
           index: index + 1
         }));
 
-        console.log('🔍 Analyzing', photos.length, 'photos...');
-        console.log('📝 Photo comments:', photosData.map(p => `${p.index}: ${p.comment || 'none'}`));
+        console.log('🔍 Analyzing', photos.length, 'photos with Vision AI...');
+        console.log('📝 Mode:', selectedMode);
+        console.log('📝 Agent type:', agentType);
         
         const response = await visionAPI.analyzePhotos(
           photosData,
-          userInstructions,
+          userInstructions || `Analyze these images for ${selectedMode} mode`,
           agentType
         );
 
         if (response.success) {
-          console.log('✅ Analysis complete!');
+          console.log('✅ Vision AI analysis complete!');
           console.log('Generated prompt:', response.data.prompt);
           
-          // Pass generated prompt to parent component
-          onPromptGenerated(response.data.prompt, response.data);
+          if (agentType === 'dating') {
+            // DATING: Pass generated prompt
+            onPromptGenerated(response.data.prompt, response.data);
+          } else {
+            // GENERAL: Pass prompt + mode + photos
+            onModeDataReady?.({
+              mode: selectedMode,
+              referenceImages: photos,
+              generatedPrompt: response.data.prompt, // AI-generated description
+              instructions: userInstructions,
+              analysis: response.data
+            });
+          }
           
           // Close modal
           handleClose();
@@ -237,22 +251,16 @@ const PhotoUploadModal = ({
           throw new Error(response.error || 'Analysis failed');
         }
       } catch (err) {
-        console.error('Analysis error:', err);
+        console.error('Vision AI analysis error:', err);
         setError(err.message || 'Failed to analyze photos');
       } finally {
         setAnalyzing(false);
       }
     } else {
-      // GENERAL: Pass mode + photos to parent
-      if (needsPhotos && photos.length === 0) {
-        setError(`This mode requires ${maxPhotos === 1 ? '1 reference image' : `${maxPhotos} reference images`}`);
-        return;
-      }
-      
-      console.log('✅ General AI mode ready:', selectedMode);
+      // GENERAL: No AI analysis - pass mode + photos only
+      console.log('✅ General AI mode ready (no AI analysis):', selectedMode);
       console.log('📸 Reference images:', photos.length);
       
-      // Pass data to parent
       onModeDataReady?.({
         mode: selectedMode,
         referenceImages: photos,
@@ -393,6 +401,40 @@ const PhotoUploadModal = ({
             </div>
           )}
 
+          {/* AI Analysis Option (General AI only) */}
+          {agentType !== 'dating' && photos.length > 0 && (
+            <div className="ai-analysis-option" style={{ 
+              marginTop: '1rem', 
+              padding: '1rem', 
+              background: '#f0f4ff', 
+              borderRadius: '8px',
+              border: '1px solid #667eea'
+            }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={useAIAnalysis}
+                  onChange={(e) => setUseAIAnalysis(e.target.checked)}
+                  disabled={analyzing}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <span style={{ fontWeight: 600 }}>
+                  🤖 Analyze photos with Vision AI
+                </span>
+              </label>
+              <p style={{ 
+                margin: '0.5rem 0 0 0', 
+                fontSize: '0.85rem', 
+                color: '#555',
+                marginLeft: '1.5rem'
+              }}>
+                {useAIAnalysis 
+                  ? '✅ AI will describe your photos and generate a prompt automatically'
+                  : '❌ Photos will be used as reference only (you must write prompt manually)'}
+              </p>
+            </div>
+          )}
+
           {/* User Instructions */}
           {photos.length > 0 && (
             <div className="instructions-section">
@@ -403,7 +445,11 @@ const PhotoUploadModal = ({
                 className="instructions-textarea"
                 value={userInstructions}
                 onChange={(e) => setUserInstructions(e.target.value)}
-                placeholder="E.g., 'Focus on the lighting style' or 'Capture the casual vibe'"
+                placeholder={agentType === 'dating' 
+                  ? "E.g., 'Focus on the lighting style' or 'Capture the casual vibe'"
+                  : useAIAnalysis
+                    ? "E.g., 'Focus on colors' or 'Emphasize the mood'"
+                    : "Describe what you want to generate based on these reference images"}
                 rows={3}
                 disabled={analyzing}
               />
@@ -415,6 +461,14 @@ const PhotoUploadModal = ({
             <span className="agent-badge">
               {agentType === 'dating' ? '💝 Dating Style Analysis' : `🎨 Mode: ${selectedMode}`}
             </span>
+            {agentType !== 'dating' && photos.length > 0 && (
+              <span className="agent-badge" style={{ 
+                marginLeft: '0.5rem', 
+                background: useAIAnalysis ? '#4caf50' : '#ff9800' 
+              }}>
+                {useAIAnalysis ? '🤖 AI Analysis' : '📸 Reference Only'}
+              </span>
+            )}
           </div>
         </div>
 
@@ -430,18 +484,19 @@ const PhotoUploadModal = ({
             className="btn-primary"
             onClick={handleAnalyze}
             disabled={
-              (agentType === 'dating' && photos.length === 0) ||
-              (agentType !== 'dating' && needsPhotos && photos.length === 0) ||
+              (needsPhotos && photos.length === 0) ||
               analyzing
             }
           >
             {analyzing 
-              ? '🔍 Analyzing...' 
+              ? '🔍 Analyzing with AI...' 
               : agentType === 'dating'
                 ? `🚀 Analyze ${photos.length} ${photos.length === 1 ? 'Photo' : 'Photos'}`
                 : needsPhotos && photos.length === 0
                   ? `Upload ${maxPhotos === 1 ? 'Image' : 'Images'} Required`
-                  : '✅ Ready to Generate'}
+                  : useAIAnalysis && photos.length > 0
+                    ? `🤖 Analyze ${photos.length} ${photos.length === 1 ? 'Photo' : 'Photos'} with AI`
+                    : '✅ Ready to Generate'}
           </button>
         </div>
       </div>

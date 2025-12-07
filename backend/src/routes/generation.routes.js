@@ -137,13 +137,20 @@ router.post('/generate', async (req, res) => {
       } else {
         // General projects: Create parameters dynamically on first generation
         console.log('🎨 General project: Creating parameters dynamically...');
-        console.log('   TODO: Implement dynamic parameter creation based on:');
         console.log('   - User prompt:', userPrompt);
         console.log('   - Mode:', mode);
         console.log('   - Reference images:', modeInputs?.referenceImages?.length || 0);
         
-        // For now, use empty parameters (General AI doesn't need weighted learning yet)
-        parameters = { mode: mode || 'text-to-image' };
+        // Create dynamic parameters based on input
+        const dynamicParams = await createDynamicParametersGeneral(
+          sessionId,
+          userPrompt,
+          mode,
+          modeInputs
+        );
+        
+        parameters = dynamicParams;
+        console.log('✅ Created dynamic parameters:', Object.keys(parameters));
       }
     } else {
       // Group existing parameters (dating format)
@@ -635,5 +642,107 @@ router.get('/unrated', async (req, res) => {
     });
   }
 });
+
+/**
+ * 🎨 Create Dynamic Parameters for General AI
+ * Analyzes first generation input and creates relevant parameters
+ */
+async function createDynamicParametersGeneral(sessionId, prompt, mode, modeInputs) {
+  console.log('🎯 Creating dynamic parameters for General AI session...');
+  
+  const parameters = {};
+  
+  // 1. MODE parameter (always included)
+  parameters.mode = mode || 'text-to-image';
+  
+  // 2. Analyze prompt for style keywords
+  const promptLower = (prompt || '').toLowerCase();
+  
+  // Style detection
+  const styles = [];
+  if (promptLower.match(/\b(realistic|photo|photorealistic)\b/)) styles.push('realistic');
+  if (promptLower.match(/\b(artistic|painting|watercolor|oil painting)\b/)) styles.push('artistic');
+  if (promptLower.match(/\b(cartoon|anime|illustration|drawing)\b/)) styles.push('cartoon');
+  if (promptLower.match(/\b(3d|render|cgi)\b/)) styles.push('3d');
+  if (promptLower.match(/\b(minimalist|simple|clean)\b/)) styles.push('minimalist');
+  
+  if (styles.length > 0) {
+    parameters.style = styles[0]; // Primary style
+  } else {
+    parameters.style = 'realistic'; // Default
+  }
+  
+  // 3. Color scheme detection
+  const colors = [];
+  if (promptLower.match(/\b(vibrant|colorful|bright|saturated)\b/)) colors.push('vibrant');
+  if (promptLower.match(/\b(dark|moody|noir|black)\b/)) colors.push('dark');
+  if (promptLower.match(/\b(pastel|soft|light|gentle)\b/)) colors.push('pastel');
+  if (promptLower.match(/\b(monochrome|black and white|grayscale)\b/)) colors.push('monochrome');
+  if (promptLower.match(/\b(warm|orange|red|yellow)\b/)) colors.push('warm');
+  if (promptLower.match(/\b(cool|blue|cyan|cold)\b/)) colors.push('cool');
+  
+  if (colors.length > 0) {
+    parameters.color_scheme = colors[0];
+  } else {
+    parameters.color_scheme = 'natural';
+  }
+  
+  // 4. Subject type detection
+  if (promptLower.match(/\b(person|woman|man|portrait|face|people)\b/)) {
+    parameters.subject_type = 'portrait';
+  } else if (promptLower.match(/\b(landscape|nature|scenery|mountain|forest|beach)\b/)) {
+    parameters.subject_type = 'landscape';
+  } else if (promptLower.match(/\b(product|item|object)\b/)) {
+    parameters.subject_type = 'product';
+  } else if (promptLower.match(/\b(interior|room|office|house)\b/)) {
+    parameters.subject_type = 'interior';
+  } else {
+    parameters.subject_type = 'general';
+  }
+  
+  // 5. Mood detection
+  const moods = [];
+  if (promptLower.match(/\b(happy|joyful|cheerful|bright)\b/)) moods.push('happy');
+  if (promptLower.match(/\b(sad|melancholy|somber|dark)\b/)) moods.push('sad');
+  if (promptLower.match(/\b(dramatic|epic|cinematic|intense)\b/)) moods.push('dramatic');
+  if (promptLower.match(/\b(calm|peaceful|serene|relaxing)\b/)) moods.push('calm');
+  if (promptLower.match(/\b(energetic|dynamic|action)\b/)) moods.push('energetic');
+  
+  if (moods.length > 0) {
+    parameters.mood = moods[0];
+  } else {
+    parameters.mood = 'neutral';
+  }
+  
+  // 6. Reference images analysis
+  if (modeInputs?.referenceImages && modeInputs.referenceImages.length > 0) {
+    parameters.has_reference = 'yes';
+    parameters.reference_count = Math.min(modeInputs.referenceImages.length, 14).toString();
+  } else {
+    parameters.has_reference = 'no';
+    parameters.reference_count = '0';
+  }
+  
+  console.log('📊 Dynamic parameters created:');
+  console.log('   - mode:', parameters.mode);
+  console.log('   - style:', parameters.style);
+  console.log('   - color_scheme:', parameters.color_scheme);
+  console.log('   - subject_type:', parameters.subject_type);
+  console.log('   - mood:', parameters.mood);
+  console.log('   - has_reference:', parameters.has_reference);
+  console.log('   - reference_count:', parameters.reference_count);
+  
+  // 7. Save parameters to database
+  try {
+    console.log('💾 Saving parameters to weight_parameters table...');
+    await weightsService.initializeSessionWeights(sessionId, parameters);
+    console.log('✅ Parameters saved successfully!');
+  } catch (error) {
+    console.error('❌ Failed to save parameters:', error);
+    // Continue anyway - parameters will be used in-memory
+  }
+  
+  return parameters;
+}
 
 export default router;

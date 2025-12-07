@@ -1,11 +1,20 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import dotenv from 'dotenv';
 
-
+dotenv.config();
 
 async function testGeminiImagen() {
   console.log('\n' + '='.repeat(80));
   console.log('🧪 TESTING GEMINI IMAGEN 3 (Nano Banana Pro)');
   console.log('='.repeat(80));
+  
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  
+  if (!GEMINI_API_KEY) {
+    console.error('❌ GEMINI_API_KEY not found in .env file!');
+    console.error('   Add to .env: GEMINI_API_KEY=your_key_here');
+    process.exit(1);
+  }
   
   try {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
