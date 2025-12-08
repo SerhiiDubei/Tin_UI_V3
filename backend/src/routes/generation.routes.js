@@ -199,19 +199,21 @@ router.post('/generate', async (req, res) => {
         console.log('   User prompt:', userPrompt?.substring(0, 100) || 'N/A');
         
         try {
-          const generatedParams = await createParametersForCategory(targetCategory, userPrompt || '');
+          const result = await createParametersForCategory(targetCategory, userPrompt || '');
           
-          if (!generatedParams || Object.keys(generatedParams).length === 0) {
+          if (!result || !result.success || !result.parameters) {
             console.error('❌ GPT-4o returned empty parameters!');
             throw new Error('Failed to generate parameters');
           }
+          
+          const generatedParams = result.parameters;
           
           console.log('✅ GPT-4o generated parameters:', Object.keys(generatedParams).length, 'categories');
           console.log('   Categories:', Object.keys(generatedParams).join(', '));
           
           // Initialize session weights with generated parameters
           console.log('💾 Initializing session weights...');
-          const initResult = await initializeSessionWeights(sessionId, generatedParams, projectId);
+          const initResult = await initializeSessionWeights(sessionId, projectId, generatedParams);
           
           if (!initResult || !initResult.success) {
             console.error('❌ Failed to initialize weights:', initResult?.error || 'Unknown error');
