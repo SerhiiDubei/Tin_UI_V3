@@ -213,7 +213,12 @@ router.post('/generate', async (req, res) => {
           
           // Initialize session weights with generated parameters
           console.log('💾 Initializing session weights...');
-          const initResult = await initializeSessionWeights(sessionId, projectId, generatedParams);
+          // Pass both parameters and metadata for proper category tracking
+          const paramsWithMeta = {
+            ...generatedParams,
+            metadata: result.metadata
+          };
+          const initResult = await initializeSessionWeights(sessionId, projectId, paramsWithMeta);
           
           if (!initResult || !initResult.success) {
             console.error('❌ Failed to initialize weights:', initResult?.error || 'Unknown error');

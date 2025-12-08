@@ -213,7 +213,9 @@ export async function initializeSessionWeights(sessionId, projectId, parameters)
       
       weightRecords.push({
         session_id: sessionId,
-        category: (parameters.metadata && parameters.metadata.category) || 'general',
+        category: (parameters.metadata?.category && typeof parameters.metadata.category === 'string') 
+          ? parameters.metadata.category 
+          : 'general',
         parameter_name: paramName,
         sub_parameter: subParam,
         weight: weight
