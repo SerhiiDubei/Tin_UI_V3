@@ -23,14 +23,15 @@ const MODES = [
     speed: '⚡ 1.2s',
     badge: 'Fast'
   },
-  {
-    id: 'image-editing',
-    name: 'Image Editing',
-    icon: '✏️',
-    description: 'Edit existing images',
-    speed: '⚡ 1.2s',
-    badge: 'Fast'
-  },
+  // DISABLED: Image editing modes (для редагування фото, не генерації)
+  // {
+  //   id: 'image-editing',
+  //   name: 'Image Editing',
+  //   icon: '✏️',
+  //   description: 'Edit existing images',
+  //   speed: '⚡ 1.2s',
+  //   badge: 'Fast'
+  // },
   {
     id: 'multi-reference',
     name: 'Multi-Reference',
@@ -39,22 +40,23 @@ const MODES = [
     speed: '⚡ 1.5s',
     badge: 'Pro'
   },
-  {
-    id: 'object-replace',
-    name: 'Object Replace',
-    icon: '🔄',
-    description: 'Replace objects precisely',
-    speed: '⚡ 1.2s',
-    badge: 'Fast'
-  },
-  {
-    id: 'background-change',
-    name: 'Background Change',
-    icon: '🌅',
-    description: 'Replace backgrounds',
-    speed: '⚡ 1.2s',
-    badge: 'Fast'
-  },
+  // DISABLED: Object manipulation modes (для редагування, не генерації)
+  // {
+  //   id: 'object-replace',
+  //   name: 'Object Replace',
+  //   icon: '🔄',
+  //   description: 'Replace objects precisely',
+  //   speed: '⚡ 1.2s',
+  //   badge: 'Fast'
+  // },
+  // {
+  //   id: 'background-change',
+  //   name: 'Background Change',
+  //   icon: '🌅',
+  //   description: 'Replace backgrounds',
+  //   speed: '⚡ 1.2s',
+  //   badge: 'Fast'
+  // },
   {
     id: 'pro-quality',
     name: 'Pro Quality',
@@ -217,6 +219,7 @@ function getModeInfo(modeId) {
 }
 
 export default ModeSelector;
+
 
 
 

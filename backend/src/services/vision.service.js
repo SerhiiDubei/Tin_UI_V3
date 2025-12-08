@@ -106,14 +106,36 @@ export async function analyzePhotosAndGeneratePrompt(photosData, userInstruction
     // Try to parse if JSON format is returned
     let analysis = null;
     let prompt = content;
+    let adContext = null; // For ad-replicator mode
     
     try {
       // Check if response contains JSON
       const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[1]);
-        analysis = parsed;
-        prompt = parsed.prompt || content;
+        
+        // Ad Replicator mode - extract structured data
+        if (mode === 'ad-replicator' && parsed.generationPrompt) {
+          console.log('\n🎯 AD REPLICATOR CONTEXT DETECTED:');
+          console.log('   Niche:', parsed.niche);
+          console.log('   Target Audience:', parsed.targetAudience);
+          console.log('   Platform:', parsed.platform);
+          
+          adContext = {
+            niche: parsed.niche,
+            targetAudience: parsed.targetAudience,
+            platform: parsed.platform,
+            styleAnalysis: parsed.styleAnalysis,
+            photoDescriptions: parsed.photoDescriptions
+          };
+          
+          prompt = parsed.generationPrompt;
+          analysis = parsed;
+        } else {
+          // Regular mode
+          analysis = parsed;
+          prompt = parsed.prompt || parsed.generationPrompt || content;
+        }
       }
     } catch (e) {
       // Not JSON, use raw content as prompt
@@ -125,12 +147,18 @@ export async function analyzePhotosAndGeneratePrompt(photosData, userInstruction
     console.log('   Category:', finalCategory);
     console.log('   Confidence:', (detection.confidence * 100).toFixed(0) + '%');
     console.log('   Subjects:', detection.subjects);
+    if (adContext) {
+      console.log('   Ad Niche:', adContext.niche);
+      console.log('   Ad Audience:', adContext.targetAudience);
+      console.log('   Ad Platform:', adContext.platform);
+    }
     console.log('='.repeat(80) + '\n');
     
     return {
       success: true,
       prompt: prompt,
       analysis: analysis,
+      adContext: adContext, // 🆕 Ad-specific context (niche, audience, platform)
       detection: detection, // 🆕 Include detection info
       category: finalCategory, // 🆕 Include final category
       imageCount: photos.length,
@@ -188,14 +216,41 @@ function buildCategoryRequest(detection, userInstructions, photos, agentType, mo
   
   // 🆕 MODE-SPECIFIC TASK
   let task;
-  const needsDetailedPerPhoto = agentType === 'general' && (
-    mode === 'multi-reference' || 
-    mode === 'ad-replicator' || 
-    photos.length > 1
-  );
   
-  if (needsDetailedPerPhoto) {
-    // GENERAL AI with multiple references - describe EACH photo separately
+  if (mode === 'ad-replicator') {
+    // AD REPLICATOR - analyze for advertising context + determine niche/audience
+    task = `**YOUR TASK:**
+Analyze these ${photos.length} reference images as ADVERTISING/MARKETING CONTENT and provide STRUCTURED data for creating similar ad creatives.
+
+**FORMAT YOUR RESPONSE AS JSON:**
+
+\`\`\`json
+{
+  "niche": "[Determine the business/product category: dating, e-commerce, beauty, fitness, real-estate, fashion, food, tech, travel, or other]",
+  "targetAudience": "[Who is this targeting? Examples: young adults 18-25, professionals 25-40, families with kids, students, retirees, etc.]",
+  "platform": "[Best platform based on style: Instagram, Facebook, TikTok, LinkedIn, Pinterest, or general]",
+  "styleAnalysis": {
+    "visualStyle": "[photography style, artistic approach]",
+    "colorPalette": "[specific colors and mood]",
+    "composition": "[framing, layout, focal points]",
+    "mood": "[emotional tone: aspirational, playful, professional, intimate, etc.]"
+  },
+  "photoDescriptions": [
+    "Photo 1: [Detailed description including subject, setting, style, notable elements]",
+    "Photo 2: [Detailed description...]"
+  ],
+  "generationPrompt": "[A comprehensive prompt for creating a NEW ad creative in this style]"
+}
+\`\`\`
+
+**GUIDELINES:**
+- **Niche**: Analyze products, subjects, settings to determine business type
+- **Target Audience**: Consider age, lifestyle, values shown in imagery
+- **Platform**: Instagram (lifestyle/visual), Facebook (broad/community), TikTok (young/dynamic), LinkedIn (professional), Pinterest (inspiration/crafts)
+- Be EXTREMELY DETAILED in photo descriptions
+- Generation prompt should capture the advertising intent and style`;
+  } else if (agentType === 'general' && (mode === 'multi-reference' || photos.length > 1)) {
+    // MULTI-REFERENCE or multiple photos - describe EACH photo separately
     task = `**YOUR TASK:**
 Analyze these ${photos.length} reference images and provide a DETAILED, STRUCTURED description for AI image generation.
 

@@ -1,6 +1,6 @@
 import express from 'express';
 import { supabase } from '../db/supabase.js';
-import { selectParametersWeighted, updateWeightsInstantly } from '../services/weights.service.js';
+import { selectParametersWeighted, updateWeightsInstantly, initializeSessionWeights } from '../services/weights.service.js';
 import { buildPromptFromParameters } from '../services/agent.service.js';
 import { buildPromptHybrid } from '../services/agent-hybrid.service.js';
 import agentGeneral from '../services/agent-general.service.js';
@@ -130,10 +130,10 @@ router.post('/generate', async (req, res) => {
     if (!weights || weights.length === 0) {
       if (agentType === 'dating') {
         // Dating projects MUST have parameters
-        return res.status(400).json({
-          success: false,
+      return res.status(400).json({
+        success: false,
           error: 'Dating session has no parameters. Was it created properly?'
-        });
+      });
       } else {
         // General projects: Create parameters dynamically on first generation
         console.log('🎨 General project: Creating parameters dynamically...');
@@ -144,6 +144,7 @@ router.post('/generate', async (req, res) => {
         // Create dynamic parameters based on input
         const dynamicParams = await createDynamicParametersGeneral(
           sessionId,
+          projectId,
           userPrompt,
           mode,
           modeInputs
@@ -154,13 +155,13 @@ router.post('/generate', async (req, res) => {
       }
     } else {
       // Group existing parameters (dating format)
-      for (const w of weights) {
-        if (!parameters[w.parameter_name]) {
-          parameters[w.parameter_name] = [];
-        }
-        parameters[w.parameter_name].push(w.sub_parameter);
+    for (const w of weights) {
+      if (!parameters[w.parameter_name]) {
+        parameters[w.parameter_name] = [];
       }
-      console.log('⚖️  Session has', Object.keys(parameters).length, 'parameter categories');
+      parameters[w.parameter_name].push(w.sub_parameter);
+    }
+    console.log('⚖️  Session has', Object.keys(parameters).length, 'parameter categories');
     }
     
     // 🚀 PARALLEL GENERATION - Generate all items simultaneously
@@ -194,9 +195,9 @@ router.post('/generate', async (req, res) => {
               // 💝 Dating Photo Expert (existing agent)
               console.log(`🎨 Using Dating Photo Expert (Hybrid)`);
               promptResult = await buildPromptHybrid(
-                userPrompt,
-                agentType,
-                category,
+              userPrompt,
+              agentType,
+              category,
                 sessionId
               );
             } else if (mode === 'ad-replicator') {
@@ -647,8 +648,10 @@ router.get('/unrated', async (req, res) => {
  * 🎨 Create Dynamic Parameters for General AI
  * Analyzes first generation input and creates relevant parameters
  */
-async function createDynamicParametersGeneral(sessionId, prompt, mode, modeInputs) {
+async function createDynamicParametersGeneral(sessionId, projectId, prompt, mode, modeInputs) {
   console.log('🎯 Creating dynamic parameters for General AI session...');
+  console.log('   Session ID:', sessionId);
+  console.log('   Project ID:', projectId);
   
   const parameters = {};
   
@@ -735,10 +738,17 @@ async function createDynamicParametersGeneral(sessionId, prompt, mode, modeInput
   // 7. Save parameters to database
   try {
     console.log('💾 Saving parameters to weight_parameters table...');
-    await weightsService.initializeSessionWeights(sessionId, parameters);
-    console.log('✅ Parameters saved successfully!');
+    console.log('📝 Parameters to save:', JSON.stringify(parameters, null, 2));
+    const result = await initializeSessionWeights(sessionId, projectId, parameters);
+    console.log('📊 Save result:', result);
+    if (result.success) {
+      console.log(`✅ Parameters saved successfully! (${result.weightsCount} weights)`);
+    } else {
+      console.error('❌ Failed to save parameters:', result.error);
+    }
   } catch (error) {
-    console.error('❌ Failed to save parameters:', error);
+    console.error('❌ Failed to save parameters (exception):', error);
+    console.error('Error details:', error);
     // Continue anyway - parameters will be used in-memory
   }
   

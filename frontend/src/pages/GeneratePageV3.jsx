@@ -6,6 +6,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import Loading from '../components/Loading';
 import PhotoUploadModal from '../components/PhotoUpload/PhotoUploadModal';
+import ModeSelector from '../components/ModeSelector';
 import './GeneratePageV3.css';
 
 // Доступні моделі для генерації
@@ -82,6 +83,8 @@ function GeneratePageV3() {
   // 🎨 General AI mode state
   const [generationMode, setGenerationMode] = useState('text-to-image');
   const [referenceImages, setReferenceImages] = useState([]);
+  const [showModeSelector, setShowModeSelector] = useState(false);
+  const [adContext, setAdContext] = useState(null); // 🆕 Ad Replicator context (niche, audience, platform)
   
   // Swipe state
   const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
@@ -151,14 +154,14 @@ function GeneratePageV3() {
       if (isGeneralMode) {
         console.log(`🎨 Mode: ${generationMode}`);
         console.log(`📸 Reference Images: ${referenceImages.length}`);
-      }
-      
+        }
+        
       // Build generation request
       const generationRequest = {
-        sessionId: sessionId,
-        projectId: projectId,
-        userId: user.id,
-        userPrompt: prompt,
+              sessionId: sessionId,
+              projectId: projectId,
+              userId: user.id,
+              userPrompt: prompt,
         count: count,
         model: selectedModel
       };
@@ -167,12 +170,20 @@ function GeneratePageV3() {
       if (isGeneralMode) {
         generationRequest.mode = generationMode;
         generationRequest.modeInputs = {};
-        
+
         // Add reference images if any
         if (referenceImages.length > 0) {
           // TODO: Upload images to storage and get URLs
           // For now, use data URLs directly (not recommended for production)
           generationRequest.modeInputs.reference_images = referenceImages.map(img => img.dataUrl || img.preview);
+        }
+        
+        // 🆕 Add ad context if available (for ad-replicator mode)
+        if (adContext) {
+          console.log('📊 Adding Ad Context to generation request:', adContext);
+          generationRequest.modeInputs.niche = adContext.niche;
+          generationRequest.modeInputs.target_audience = adContext.targetAudience;
+          generationRequest.modeInputs.platform = adContext.platform;
         }
       }
       
@@ -196,9 +207,9 @@ function GeneratePageV3() {
         if (successfulItems.length > 0) {
           setGeneratedItems(successfulItems);
           setProgress({ current: successfulItems.length, total: count });
-          setGenerating(false);
-          setLoadingNext(false);
-          setGenerationComplete(true);
+        setGenerating(false);
+        setLoadingNext(false);
+        setGenerationComplete(true);
           
           console.log('🎉 All images ready for swiping!');
         } else {
@@ -357,11 +368,18 @@ function GeneratePageV3() {
     console.log('   - referenceImages:', data.referenceImages?.length || 0);
     console.log('   - generatedPrompt:', data.generatedPrompt ? 'YES ✅' : 'NO ❌');
     console.log('   - instructions:', data.instructions || 'none');
+    console.log('   - adContext:', data.adContext || 'none');
     console.log('========================================');
-    
+
     // Set mode and reference images
     setGenerationMode(data.mode);
     setReferenceImages(data.referenceImages || []);
+    
+    // 🆕 Store ad context if provided (for ad-replicator mode)
+    if (data.adContext) {
+      console.log('📊 Storing Ad Context:', data.adContext);
+      setAdContext(data.adContext);
+    }
     
     // Priority for prompt: generatedPrompt (AI) > instructions (user) > existing prompt
     if (data.generatedPrompt) {
@@ -708,8 +726,8 @@ function GeneratePageV3() {
                 </button>
               </div>
               
-              {/* 🎨 General AI: Show selected mode & reference images summary */}
-              {isGeneralMode && (generationMode !== 'text-to-image' || referenceImages.length > 0) && (
+              {/* 🎨 General AI: Mode Selector (always show) */}
+              {isGeneralMode && !showModeSelector && (
                 <div className="mode-summary" style={{ 
                   marginTop: '1rem', 
                   padding: '0.75rem', 
@@ -743,7 +761,7 @@ function GeneratePageV3() {
                     </div>
                   )}
                   <button
-                    onClick={handlePhotoUpload}
+                    onClick={() => setShowModeSelector(true)}
                     style={{
                       padding: '0.5rem 1rem',
                       background: '#667eea',
@@ -755,6 +773,40 @@ function GeneratePageV3() {
                     }}
                   >
                     ⚙️ Change Mode
+                  </button>
+                </div>
+              )}
+              
+              {/* 🎨 Mode Selector Component */}
+              {isGeneralMode && showModeSelector && (
+                <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+                  <ModeSelector
+                    selectedMode={generationMode}
+                    onModeChange={(newMode) => {
+                      console.log('🎨 Mode changed:', newMode);
+                      setGenerationMode(newMode);
+                      setShowModeSelector(false);
+                      
+                      // Show info message
+                      const needsPhotos = ['style-transfer', 'multi-reference', 'ad-replicator'].includes(newMode);
+                      if (needsPhotos) {
+                        console.log(`ℹ️ Mode "${newMode}" потребує фото. Натисни "📸 Upload Photos" коли будеш готовий.`);
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => setShowModeSelector(false)}
+                    style={{
+                      marginTop: '0.5rem',
+                      padding: '0.5rem 1rem',
+                      background: '#ccc',
+                      color: '#333',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
                   </button>
                 </div>
               )}
@@ -1247,6 +1299,7 @@ Select mode above and upload images if needed!`)
           onPromptGenerated={handlePromptGenerated}
           onModeDataReady={handleModeDataReady}
           agentType={project?.tag === 'dating' ? 'dating' : 'general'}
+          initialMode={generationMode}
         />
 
         {/* Comment Modal */}

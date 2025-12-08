@@ -41,10 +41,16 @@ export async function buildPromptGeneral(userPrompt, modeId = 'text-to-image', m
     console.log(`📋 Selected Mode: ${mode.name} (${mode.icon})`);
     console.log(`🤖 Using Model: ${mode.model}`);
     
-    // 2. Validate inputs
-    const validation = validateModeInputs(modeId, modeInputs);
+    // 2. Validate inputs (pass userPrompt for prompt validation)
+    const validation = validateModeInputs(modeId, modeInputs, userPrompt);
     if (!validation.valid) {
       throw new Error(`Invalid inputs: ${validation.errors.join(', ')}`);
+    }
+    
+    // 2.5. Normalize reference images for style-transfer (accept both singular and plural)
+    if (modeId === 'style-transfer' && !modeInputs.reference_image && modeInputs.reference_images) {
+      modeInputs.reference_image = modeInputs.reference_images[0]; // Use first image
+      console.log('🔄 Converted reference_images to reference_image for style-transfer');
     }
     
     // 3. Get agent config
@@ -355,6 +361,7 @@ Key principles:
 export default {
   buildPromptGeneral
 };
+
 
 
 

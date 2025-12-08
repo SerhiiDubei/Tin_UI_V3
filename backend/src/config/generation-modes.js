@@ -262,11 +262,28 @@ export function getModesByCapability(capability) {
 /**
  * Validate mode inputs
  */
-export function validateModeInputs(modeId, inputs) {
+export function validateModeInputs(modeId, inputs, userPrompt = '') {
   const mode = getMode(modeId);
   const errors = [];
 
   for (const [key, config] of Object.entries(mode.inputs)) {
+    // SKIP PROMPT validation - it's passed separately as userPrompt parameter
+    if (key === 'prompt') {
+      if (config.required && !userPrompt) {
+        errors.push(`prompt is required for ${mode.name} mode`);
+      }
+      continue; // Don't check inputs.prompt
+    }
+
+    // For style-transfer: accept BOTH reference_image OR reference_images
+    if (modeId === 'style-transfer' && key === 'reference_image') {
+      const hasImage = inputs.reference_image || (inputs.reference_images && inputs.reference_images.length > 0);
+      if (config.required && !hasImage) {
+        errors.push(`${key} is required for ${mode.name} mode`);
+      }
+      continue;
+    }
+
     if (config.required && !inputs[key]) {
       errors.push(`${key} is required for ${mode.name} mode`);
     }
@@ -296,6 +313,7 @@ export default {
   getModesByCapability,
   validateModeInputs
 };
+
 
 
 

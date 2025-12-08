@@ -18,7 +18,8 @@ const PhotoUploadModal = ({
   onClose, 
   onPromptGenerated, 
   agentType = 'general',
-  onModeDataReady // New callback for General AI (mode + reference images)
+  onModeDataReady, // New callback for General AI (mode + reference images)
+  initialMode = 'style-transfer' // Accept initial mode from parent
 }) => {
   // All hooks MUST be before any conditional return
   const [photos, setPhotos] = useState([]);
@@ -26,9 +27,16 @@ const PhotoUploadModal = ({
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
-  const [selectedMode, setSelectedMode] = useState('style-transfer'); // Default to first reference-based mode
+  const [selectedMode, setSelectedMode] = useState(initialMode); // Use initialMode from props
   const [isDragging, setIsDragging] = useState(false);
   const [useAIAnalysis, setUseAIAnalysis] = useState(true); // Auto-analyze photos with Vision AI
+  
+  // Update selectedMode when initialMode changes
+  React.useEffect(() => {
+    if (isOpen) {
+      setSelectedMode(initialMode);
+    }
+  }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
   
@@ -209,63 +217,71 @@ const PhotoUploadModal = ({
       setError(`Please upload ${maxPhotos === 1 ? '1 reference image' : `${maxPhotos} reference images`}`);
       return;
     }
-    
+
     // UNIVERSAL: Vision AI Analysis (for both Dating and General if photos uploaded)
     if (photos.length > 0 && useAIAnalysis) {
       console.log('✅ CALLING VISION AI...');
-      setAnalyzing(true);
-      setError(null);
+    setAnalyzing(true);
+    setError(null);
 
-      try {
-        // Import API service
-        const { visionAPI } = await import('../../services/api-v3.js');
-        
-        // Build photos array with comments
-        const photosData = photos.map((p, index) => ({
-          url: p.dataUrl,
-          comment: p.comment || '',
-          index: index + 1
-        }));
+    try {
+      // Import API service
+      const { visionAPI } = await import('../../services/api-v3.js');
+      
+      // Build photos array with comments
+      const photosData = photos.map((p, index) => ({
+        url: p.dataUrl,
+        comment: p.comment || '',
+        index: index + 1
+      }));
 
         console.log('🔍 Analyzing', photos.length, 'photos with Vision AI...');
         console.log('📝 Mode:', selectedMode);
         console.log('📝 Agent type:', agentType);
-        
-        const response = await visionAPI.analyzePhotos(
-          photosData,
+      
+      const response = await visionAPI.analyzePhotos(
+        photosData,
           userInstructions || `Analyze these images for ${selectedMode} mode`,
           agentType,
           selectedMode // Pass mode to backend
-        );
+      );
 
-        if (response.success) {
+      if (response.success) {
           console.log('✅ Vision AI analysis complete!');
-          console.log('Generated prompt:', response.data.prompt);
-          
+        console.log('Generated prompt:', response.data.prompt);
+        
           if (agentType === 'dating') {
             // DATING: Pass generated prompt
-            onPromptGenerated(response.data.prompt, response.data);
+        onPromptGenerated(response.data.prompt, response.data);
           } else {
-            // GENERAL: Pass prompt + mode + photos
-            onModeDataReady?.({
+            // GENERAL: Pass prompt + mode + photos + ad context
+            const modeData = {
               mode: selectedMode,
               referenceImages: photos,
               generatedPrompt: response.data.prompt, // AI-generated description
               instructions: userInstructions,
               analysis: response.data
-            });
+            };
+            
+            // 🆕 Add ad context if available (for ad-replicator mode)
+            if (response.data.adContext) {
+              console.log('📊 Adding Ad Context:', response.data.adContext);
+              modeData.adContext = response.data.adContext;
+            }
+            
+            onModeDataReady?.(modeData);
           }
-          
-          // Close modal
-          handleClose();
-        } else {
-          throw new Error(response.error || 'Analysis failed');
-        }
-      } catch (err) {
+        
+        // Close modal
+        handleClose();
+      } else {
+        throw new Error(response.error || 'Analysis failed');
+      }
+    } catch (err) {
         console.error('Vision AI analysis error:', err);
-        setError(err.message || 'Failed to analyze photos');
-      } finally {
-        setAnalyzing(false);
+      setError(err.message || 'Failed to analyze photos');
+    } finally {
+      setAnalyzing(false);
       }
     } else {
       // GENERAL: No AI analysis - pass mode + photos only
@@ -345,21 +361,21 @@ const PhotoUploadModal = ({
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
               >
-                <input
-                  type="file"
-                  id="photo-upload-input"
+            <input
+              type="file"
+              id="photo-upload-input"
                   multiple={maxPhotos > 1}
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  style={{ display: 'none' }}
+              accept="image/*"
+              onChange={handleFileSelect}
+              style={{ display: 'none' }}
                   disabled={analyzing || photos.length >= maxPhotos}
-                />
-                <label 
-                  htmlFor="photo-upload-input" 
+            />
+            <label 
+              htmlFor="photo-upload-input" 
                   className={`upload-label ${photos.length >= maxPhotos ? 'disabled' : ''}`}
-                >
+            >
                   <div className="upload-icon">{isDragging ? '⬇️' : '📤'}</div>
-                  <div className="upload-text">
+              <div className="upload-text">
                     {isDragging 
                       ? 'Drop images here!' 
                       : agentType === 'dating' 
@@ -367,13 +383,13 @@ const PhotoUploadModal = ({
                         : maxPhotos === 1 
                           ? 'Click to upload or drag & drop image'
                           : 'Click to upload or drag & drop images'}
-                    <br />
-                    <span className="upload-hint">
+                <br />
+                <span className="upload-hint">
                       {photos.length}/{maxPhotos} {maxPhotos === 1 ? 'image' : 'images'} · Max 15MB per file
-                    </span>
-                  </div>
-                </label>
+                </span>
               </div>
+            </label>
+          </div>
             </div>
           )}
 

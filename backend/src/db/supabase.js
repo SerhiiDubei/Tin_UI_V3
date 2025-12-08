@@ -14,7 +14,7 @@ export async function testConnection() {
       .from('users')
       .select('count')
       .limit(1);
-
+    
     if (error) throw error;
     
     console.log('✅ Supabase connection successful');

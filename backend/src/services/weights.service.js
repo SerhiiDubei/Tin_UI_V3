@@ -178,20 +178,29 @@ export async function initializeSessionWeights(sessionId, projectId, parameters)
       // Initialize all parameters with weight 100
       // Check if parameters is object with options (dating) or different format (general)
       if (parameters && typeof parameters === 'object') {
+        console.log('🔍 Processing parameters for weights:', Object.keys(parameters));
         for (const [paramName, options] of Object.entries(parameters)) {
           // Skip metadata
           if (paramName === 'metadata') continue;
+          
+          console.log(`  📌 ${paramName}: ${typeof options} = ${Array.isArray(options) ? `[${options.length} items]` : options}`);
           
           // If options is array (dating parameters)
           if (Array.isArray(options)) {
             for (const option of options) {
               baseWeights[`${paramName}.${option}`] = 100.0;
+              console.log(`     ✅ Created weight: ${paramName}.${option}`);
             }
           } else {
-            // For general mode or single value parameters
-            baseWeights[paramName] = 100.0;
+            // For general mode or single value parameters (store as paramName.value)
+            const key = `${paramName}.${options}`;
+            baseWeights[key] = 100.0;
+            console.log(`     ✅ Created weight: ${key}`);
           }
         }
+        console.log(`🎯 Total baseWeights created: ${Object.keys(baseWeights).length}`);
+      } else {
+        console.log('⚠️ Parameters is not a valid object:', typeof parameters);
       }
     }
     
@@ -200,7 +209,7 @@ export async function initializeSessionWeights(sessionId, projectId, parameters)
     for (const [key, weight] of Object.entries(baseWeights)) {
       const parts = key.split('.');
       const paramName = parts[0];
-      const subParam = parts.length > 1 ? parts[1] : null;
+      const subParam = parts.length > 1 ? parts[1] : parts[0]; // Use paramName if no sub_parameter
       
       weightRecords.push({
         session_id: sessionId,
@@ -377,31 +386,45 @@ export async function selectParametersWeighted(sessionId, parameters) {
     
     // Select one option from each parameter category
     for (const [paramName, options] of Object.entries(parameters)) {
-      if (!Array.isArray(options)) continue;
+      // Skip metadata
+      if (paramName === 'metadata') continue;
       
-      // Get weights for this parameter's options
-      const optionWeights = options.map(opt => {
-        const key = `${paramName}.${opt}`;
-        return weightLookup[key] || 100;
-      });
+      // Handle BOTH formats:
+      // Dating AI: {style: ["realistic", "artistic"]} - select from array
+      // General AI: {style: "realistic"} - use value directly
       
-      // Weighted random selection
-      const totalWeight = optionWeights.reduce((sum, w) => sum + w, 0);
-      let random = Math.random() * totalWeight;
-      
-      let selectedOption = options[0]; // fallback
-      for (let i = 0; i < options.length; i++) {
-        random -= optionWeights[i];
-        if (random <= 0) {
-          selectedOption = options[i];
-          break;
+      if (Array.isArray(options)) {
+        // Dating AI: Weighted random selection from array
+        const optionWeights = options.map(opt => {
+          const key = `${paramName}.${opt}`;
+          return weightLookup[key] || 100;
+        });
+        
+        // Weighted random selection
+        const totalWeight = optionWeights.reduce((sum, w) => sum + w, 0);
+        let random = Math.random() * totalWeight;
+        
+        let selectedOption = options[0]; // fallback
+        for (let i = 0; i < options.length; i++) {
+          random -= optionWeights[i];
+          if (random <= 0) {
+            selectedOption = options[i];
+            break;
+          }
         }
+        
+        selected[paramName] = {
+          value: selectedOption,
+          weight: weightLookup[`${paramName}.${selectedOption}`] || 100
+        };
+      } else {
+        // General AI: Use value directly (already set)
+        const key = `${paramName}.${options}`;
+        selected[paramName] = {
+          value: options,
+          weight: weightLookup[key] || 100
+        };
       }
-      
-      selected[paramName] = {
-        value: selectedOption,
-        weight: weightLookup[`${paramName}.${selectedOption}`] || 100
-      };
     }
     
     console.log('✅ Parameters selected:', Object.keys(selected).length);
