@@ -85,6 +85,7 @@ function GeneratePageV3() {
   const [referenceImages, setReferenceImages] = useState([]);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [adContext, setAdContext] = useState(null); // 🆕 Ad Replicator context (niche, audience, platform)
+  const [visionCategory, setVisionCategory] = useState(null); // 🆕 Vision AI detected category
   
   // Swipe state
   const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
@@ -184,6 +185,12 @@ function GeneratePageV3() {
           generationRequest.modeInputs.niche = adContext.niche;
           generationRequest.modeInputs.target_audience = adContext.targetAudience;
           generationRequest.modeInputs.platform = adContext.platform;
+        }
+        
+        // 🆕 Add Vision AI category if available (for parameter generation)
+        if (visionCategory) {
+          console.log('🏷️ Adding Vision AI Category to generation request:', visionCategory);
+          generationRequest.modeInputs.visionCategory = visionCategory;
         }
       }
       
@@ -381,6 +388,12 @@ function GeneratePageV3() {
       setAdContext(data.adContext);
     }
     
+    // 🆕 Store Vision AI detected category (for parameter generation)
+    if (data.visionCategory) {
+      console.log('🏷️ Storing Vision AI Category:', data.visionCategory);
+      setVisionCategory(data.visionCategory);
+    }
+    
     // Priority for prompt: generatedPrompt (AI) > instructions (user) > existing prompt
     if (data.generatedPrompt) {
       // AI generated prompt from Vision AI
@@ -391,6 +404,7 @@ function GeneratePageV3() {
       setGeneratedPromptData({
         prompt: data.generatedPrompt,
         analysis: data.analysis,
+        category: data.visionCategory, // 🆕 Include category
         timestamp: new Date().toISOString()
       });
       

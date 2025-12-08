@@ -269,6 +269,12 @@ const PhotoUploadModal = ({
               modeData.adContext = response.data.adContext;
             }
             
+            // 🆕 Add Vision AI category if available (for parameter generation)
+            if (response.data.category) {
+              console.log('🏷️ Adding Vision AI Category:', response.data.category);
+              modeData.visionCategory = response.data.category;
+            }
+            
             onModeDataReady?.(modeData);
           }
         
