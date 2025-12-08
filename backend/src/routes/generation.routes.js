@@ -1,6 +1,12 @@
 import express from 'express';
 import { supabase } from '../db/supabase.js';
-import { selectParametersWeighted, updateWeightsInstantly, initializeSessionWeights, createParametersForCategory } from '../services/weights.service.js';
+import { 
+  selectParametersWeighted, 
+  updateWeightsInstantly, 
+  initializeSessionWeights, 
+  createParametersForCategory,
+  extractDynamicParameters // 🆕 New function
+} from '../services/weights.service.js';
 import { buildPromptFromParameters } from '../services/agent.service.js';
 import { buildPromptHybrid } from '../services/agent-hybrid.service.js';
 import agentGeneral from '../services/agent-general.service.js';
@@ -14,6 +20,11 @@ import { MODELS_CONFIG, getModelsForType } from '../config/models.js';
 import { quickValidate } from '../services/qa-agent.service.js';
 
 const router = express.Router();
+
+// 🚩 FEATURE FLAG: Enable dynamic parameter extraction
+// Set to false to use universal parameters (safe default)
+// Set to true to use context-aware dynamic extraction (experimental)
+const USE_DYNAMIC_PARAMETERS = false; // ← Change to true for testing
 
 /**
  * GET /api/generation/models
@@ -229,13 +240,46 @@ router.post('/generate', async (req, res) => {
           console.log('ℹ️ Using mode-based category as last resort:', targetCategory);
         }
         
-        // Use proper GPT-4o parameter generation from weights.service.js
-        console.log('🤖 Calling GPT-4o to generate 11-14 parameter categories...');
+        // 🔧 PARAMETER GENERATION STRATEGY
+        console.log('🤖 Generating parameter categories...');
         console.log('   Target category:', targetCategory);
         console.log('   User prompt:', userPrompt?.substring(0, 100) || 'N/A');
+        console.log('   Dynamic extraction enabled:', USE_DYNAMIC_PARAMETERS);
         
         try {
-          const result = await createParametersForCategory(targetCategory, userPrompt || '');
+          let result;
+          
+          // 🆕 TRY DYNAMIC EXTRACTION (if enabled and Vision AI data available)
+          if (USE_DYNAMIC_PARAMETERS && modeInputs?.visionAnalysis) {
+            console.log('🔍 Attempting DYNAMIC parameter extraction from content...');
+            
+            try {
+              result = await extractDynamicParameters(
+                modeInputs.visionAnalysis,
+                userPrompt || '',
+                targetCategory
+              );
+              
+              if (result && result.success && result.parameters) {
+                console.log('✅ Dynamic extraction successful!');
+                console.log('   Method:', result.metadata?.method);
+                console.log('   Source:', result.metadata?.source);
+              } else {
+                console.warn('⚠️ Dynamic extraction failed, falling back to universal parameters');
+                result = null; // Force fallback
+              }
+            } catch (dynamicError) {
+              console.error('❌ Dynamic extraction error:', dynamicError.message);
+              console.log('↩️ Falling back to universal parameters');
+              result = null; // Force fallback
+            }
+          }
+          
+          // FALLBACK: Use universal parameters (original method)
+          if (!result) {
+            console.log('🔄 Using UNIVERSAL parameter generation (fallback)');
+            result = await createParametersForCategory(targetCategory, userPrompt || '');
+          }
           
           if (!result || !result.success || !result.parameters) {
             console.error('❌ GPT-4o returned empty parameters!');
@@ -246,6 +290,7 @@ router.post('/generate', async (req, res) => {
           
           console.log('✅ GPT-4o generated parameters:', Object.keys(generatedParams).length, 'categories');
           console.log('   Categories:', Object.keys(generatedParams).join(', '));
+          console.log('   Generation method:', result.metadata?.method || 'universal');
           
           // Initialize session weights with generated parameters
           console.log('💾 Initializing session weights...');

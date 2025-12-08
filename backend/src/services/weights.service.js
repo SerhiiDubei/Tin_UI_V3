@@ -17,6 +17,170 @@ const openai = new OpenAI({
  */
 
 /**
+ * 🆕 DYNAMIC PARAMETER EXTRACTION (context-aware)
+ * 
+ * Analyzes Vision AI output and Master Prompt to extract KEY PARAMETERS
+ * that actually define the content, rather than using generic universal params.
+ * 
+ * EXAMPLES:
+ * - Automotive insurance: vehicle_positioning, trust_elements, brand_colors
+ * - Food photography: dish_presentation, plating_surface, garnish_styling
+ * - Dating profiles: photo_style, setting_intimacy, expression_authenticity
+ * 
+ * @param {Object} visionAnalysis - Vision AI analysis object with photoDescriptions
+ * @param {string} masterPrompt - Generated master prompt for content
+ * @param {string} category - Content category hint
+ * @returns {Object} Extracted parameters (11-14 categories, 4-6 options each)
+ */
+export async function extractDynamicParameters(visionAnalysis, masterPrompt, category = 'general') {
+  console.log('\n🔍 EXTRACTING DYNAMIC PARAMETERS FROM CONTENT');
+  console.log('Category hint:', category);
+  console.log('Has Vision AI:', !!visionAnalysis);
+  console.log('Has Master Prompt:', !!masterPrompt);
+  
+  try {
+    // Build context from Vision AI
+    let visionContext = '';
+    if (visionAnalysis?.analysis?.photoDescriptions) {
+      visionContext = '\n\n📸 VISION AI PHOTO DESCRIPTIONS:\n' +
+        visionAnalysis.analysis.photoDescriptions.map((desc, i) => 
+          `Photo ${i + 1}: ${desc}`
+        ).join('\n\n');
+    }
+    
+    // Build context from styleAnalysis
+    let styleContext = '';
+    if (visionAnalysis?.analysis?.styleAnalysis) {
+      const style = visionAnalysis.analysis.styleAnalysis;
+      styleContext = `\n\n🎨 STYLE ANALYSIS:\n` +
+        `Visual Style: ${style.visualStyle || 'N/A'}\n` +
+        `Color Palette: ${style.colorPalette || 'N/A'}\n` +
+        `Composition: ${style.composition || 'N/A'}\n` +
+        `Mood: ${style.mood || 'N/A'}`;
+    }
+    
+    const systemPrompt = `You are an AI parameter extraction specialist.
+
+🎯 YOUR TASK:
+Analyze the provided Vision AI descriptions and Master Prompt to extract the KEY PARAMETERS that define this specific content.
+
+CRITICAL REQUIREMENTS:
+1. Extract EXACTLY 12 parameter categories
+2. Each category must have 5-6 specific options AS AN ARRAY
+3. Parameters should be CONTEXT-SPECIFIC (extracted from the actual content)
+4. Include both UNIVERSAL parameters (lighting, composition) and CONTENT-SPECIFIC parameters
+5. IMPORTANT: Each value MUST be an array of strings, NOT nested objects
+
+PARAMETER EXTRACTION STRATEGY:
+
+BASE UNIVERSAL (always include 4-5 of these):
+- composition: [framing styles from content]
+- lighting: [lighting types mentioned]
+- color_palette: [color schemes observed]
+- depth_of_field: [depth techniques seen]
+
+CONTENT-SPECIFIC (extract 7-8 based on what you see):
+Examples:
+- For vehicles: vehicle_positioning, trust_elements, vehicle_type
+- For food: dish_presentation, plating_surface, garnish_styling
+- For people: photo_style, expression_type, clothing_style
+- For products: product_angle, background_style, prop_usage
+
+EXTRACTION RULES:
+✅ Extract parameters that are MENTIONED or IMPLIED in content
+✅ Use specific values from Vision AI descriptions (e.g., "3_4_angle" not just "angle")
+✅ Include variations that make sense for this content type
+❌ Don't invent parameters not related to content
+❌ Don't use nested objects - only arrays of strings
+
+EXAMPLE OUTPUT FORMAT:
+{
+  "composition": ["centered", "rule_of_thirds", "symmetrical", "dynamic", "asymmetric"],
+  "lighting": ["golden_hour", "natural_soft", "studio_bright", "dramatic_shadow", "evening"],
+  "vehicle_positioning": ["3_4_front_angle", "side_profile", "front_view", "rear_angle", "overhead"],
+  "trust_visual_elements": ["shield_icon", "checkmark_badge", "lock_symbol", "verified_seal", "security_badge"],
+  "brand_color_palette": ["corporate_blue", "luxury_black_gold", "family_green", "trust_silver", "urgent_red"],
+  ...
+}
+
+Category context: "${category}"`;
+
+    const userMessage = `Analyze this content and extract 12 KEY PARAMETERS with 5-6 options each.
+${visionContext}
+${styleContext}
+
+🎯 MASTER PROMPT:
+${masterPrompt || 'No master prompt provided'}
+
+Extract the parameters that DEFINE this specific content. Return ONLY valid JSON.`;
+
+    console.log('⏳ Calling GPT-4o for dynamic parameter extraction...');
+    const startTime = Date.now();
+    
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.7,
+      max_tokens: 2000
+    });
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ GPT-4o response (${duration}ms)`);
+    
+    let parameters = JSON.parse(response.choices[0].message.content);
+    
+    // Normalize structure (same as createParametersForCategory)
+    const normalizedParams = {};
+    for (const [cat, value] of Object.entries(parameters)) {
+      if (cat === 'metadata') continue;
+      
+      if (Array.isArray(value)) {
+        normalizedParams[cat] = value;
+      } else if (typeof value === 'object' && value !== null) {
+        console.warn(`⚠️ Category "${cat}" is nested object, extracting values...`);
+        normalizedParams[cat] = Object.values(value);
+      } else {
+        console.warn(`⚠️ Category "${cat}" is single value, wrapping...`);
+        normalizedParams[cat] = [value];
+      }
+    }
+    
+    parameters = normalizedParams;
+    
+    // Validate
+    const categoryCount = Object.keys(parameters).length;
+    console.log('✅ Extracted parameters:');
+    console.log(`   Categories: ${categoryCount}`);
+    console.log(`   Total sub-parameters: ${Object.values(parameters).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0)}`);
+    console.log(`   Parameter names:`, Object.keys(parameters).join(', '));
+    
+    return {
+      success: true,
+      parameters,
+      metadata: {
+        category,
+        method: 'dynamic_extraction',
+        categoriesCount: categoryCount,
+        totalSubParameters: Object.values(parameters).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0),
+        type: 'dynamic',
+        source: 'GPT-4o + Vision AI + Master Prompt'
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Dynamic parameter extraction failed:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
  * Create parameters dynamically based on category and user prompt
  * Agent decides what parameters are needed for this specific use case
  * 
