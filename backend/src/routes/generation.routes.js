@@ -320,7 +320,8 @@ router.post('/generate', async (req, res) => {
                   niche: modeInputs.niche,
                   targetAudience: modeInputs.target_audience,
                   platform: modeInputs.platform,
-                  variations: count  // Use count as number of variations
+                  variations: count,  // Use count as number of variations
+                  visionAnalysis: modeInputs.visionAnalysis  // 🆕 Pass Vision AI analysis
                 }
               );
               

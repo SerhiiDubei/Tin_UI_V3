@@ -160,6 +160,16 @@ export async function buildAdCreatives(userPrompt, referenceImages = [], additio
   console.log('Context:', additionalContext);
   
   try {
+    // Extract Vision AI analysis if available
+    const visionAnalysis = additionalContext.visionAnalysis;
+    let photoDescriptions = '';
+    
+    if (visionAnalysis && visionAnalysis.photoDescriptions) {
+      console.log('✅ Using Vision AI detailed photo descriptions');
+      photoDescriptions = '\n\n📸 DETAILED PHOTO ANALYSIS (from Vision AI):\n' +
+        visionAnalysis.photoDescriptions.map((desc, i) => `Photo ${i + 1}: ${desc}`).join('\n');
+    }
+    
     // Build user message
     const userMessage = `
 🎯 TASK: Analyze competitor ad creatives and generate NEW original ads
@@ -172,6 +182,7 @@ ${additionalContext.niche ? `📊 Niche: ${additionalContext.niche}` : ''}
 ${additionalContext.targetAudience ? `👥 Target Audience: ${additionalContext.targetAudience}` : ''}
 ${additionalContext.platform ? `📱 Platform: ${additionalContext.platform}` : ''}
 ${additionalContext.variations ? `🔢 Variations Needed: ${additionalContext.variations}` : '🔢 Variations Needed: 3-5'}
+${photoDescriptions}
 
 📝 YOUR TASK:
 1. Analyze all ${referenceImages.length} reference images

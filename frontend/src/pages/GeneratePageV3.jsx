@@ -192,6 +192,12 @@ function GeneratePageV3() {
           console.log('🏷️ Adding Vision AI Category to generation request:', visionCategory);
           generationRequest.modeInputs.visionCategory = visionCategory;
         }
+        
+        // 🆕 Add Vision AI analysis if available (for detailed photo descriptions)
+        if (generatedPromptData?.analysis) {
+          console.log('🔍 Adding Vision AI Analysis to generation request');
+          generationRequest.modeInputs.visionAnalysis = generatedPromptData.analysis;
+        }
       }
       
       const response = await generationAPI.generate(generationRequest);
