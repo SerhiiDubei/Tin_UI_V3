@@ -249,34 +249,35 @@ Analyze these ${photos.length} reference images as ADVERTISING/MARKETING CONTENT
 - **Platform**: Instagram (lifestyle/visual), Facebook (broad/community), TikTok (young/dynamic), LinkedIn (professional), Pinterest (inspiration/crafts)
 - Be EXTREMELY DETAILED in photo descriptions
 - Generation prompt should capture the advertising intent and style`;
-  } else if (agentType === 'general' && (mode === 'multi-reference' || photos.length > 1)) {
-    // MULTI-REFERENCE or multiple photos - describe EACH photo separately
+  } else if (agentType === 'general') {
+    // GENERAL AI - ALWAYS use detailed per-photo analysis
     task = `**YOUR TASK:**
-Analyze these ${photos.length} reference images and provide a DETAILED, STRUCTURED description for AI image generation.
+Analyze these ${photos.length} reference ${photos.length === 1 ? 'image' : 'images'} and provide a DETAILED, STRUCTURED description for AI image generation.
 
 **FORMAT YOUR RESPONSE AS:**
 
 📸 **INDIVIDUAL IMAGE DESCRIPTIONS:**
-Photo 1: [Detailed description of specific elements, subjects, composition, style]
-Photo 2: [Detailed description of specific elements, subjects, composition, style]
-${photos.length > 2 ? `Photo ${photos.length}: [Continue for all photos...]` : ''}
+${photos.map((_, i) => `Photo ${i + 1}: [EXTREMELY DETAILED description: subjects, their exact poses/expressions, clothing details, background elements, composition, lighting quality, color palette, mood, camera angle, depth of field, any text/logos visible, overall atmosphere]`).join('\n')}
 
 🎨 **COMMON STYLE ELEMENTS:**
-- Visual style: [artistic style, rendering technique]
-- Color palette: [specific colors, tones, mood]
-- Lighting: [lighting setup, mood, shadows]
-- Composition: [framing, perspective, balance]
-- Key characteristics: [unique features that define the style]
+- Visual style: [specific artistic style, rendering technique, photography type]
+- Color palette: [exact colors and tones - be specific like "warm golden hour sunlight", "cool blue-grey tones", "vibrant saturated colors"]
+- Lighting: [precise lighting setup - "soft diffused natural light from left", "dramatic side lighting with deep shadows", "bright studio lighting"]
+- Composition: [detailed framing - "rule of thirds with subject left", "centered symmetrical", "tight close-up", "wide environmental shot"]
+- Technical details: [camera settings feel, depth of field, focus, any motion blur, grain/texture]
+- Key characteristics: [unique features that define this specific style - be very specific!]
 
 🎯 **GENERATION PROMPT:**
-[A single, comprehensive prompt that captures ALL elements above for generating a NEW image in this style]
+[A single, comprehensive, EXTREMELY DETAILED prompt (150-300 words) that captures ALL specific elements above for generating a NEW image in this exact style. Include: subject details, pose/expression, clothing, setting/background, lighting specifics, color palette, mood, composition, technical aspects]
 
-**REMEMBER:**
-- Be EXTREMELY DETAILED for each photo (colors, subjects, poses, backgrounds, lighting, mood)
-- Include SPECIFIC DIFFERENCES between photos (this helps AI understand variation)
-- The final prompt should guide creating ONE new image that captures the essence of ALL references`;
+**CRITICAL REQUIREMENTS:**
+- Be EXTREMELY DETAILED for each photo (specific colors, exact poses, detailed backgrounds, precise lighting)
+- Include SPECIFIC DIFFERENCES between photos (helps AI understand the range of variation)
+- Mention EXACT details: "woman in red floral dress" not "woman in dress", "soft golden hour sunlight from right" not "natural lighting"
+- The final prompt should be DETAILED ENOUGH to replicate the style precisely
+- Include technical aspects: camera angle, depth of field, focus, lighting direction`;
   } else {
-    // DATING or single image - unified style description
+    // DATING - unified style description (focus on common elements)
     task = `**YOUR TASK:**
 Analyze these ${photos.length} reference ${photos.length === 1 ? 'image' : 'images'} of "${subjects}" and extract their COMMON VISUAL STYLE.
 Generate ONE detailed, cohesive prompt for creating a SINGLE NEW image in this unified style.

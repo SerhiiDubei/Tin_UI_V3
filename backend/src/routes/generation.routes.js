@@ -127,9 +127,18 @@ router.post('/generate', async (req, res) => {
     
     let parameters = {};
     
+    console.log('📊 Weight check:', {
+      weightsCount: weights?.length || 0,
+      agentType,
+      sessionId: sessionId.substring(0, 8) + '...'
+    });
+    
     if (!weights || weights.length === 0) {
+      console.log('⚠️ No weights found - will create dynamically');
+      
       if (agentType === 'dating') {
         // Dating projects MUST have parameters
+        console.error('❌ Dating session missing parameters!');
       return res.status(400).json({
         success: false,
           error: 'Dating session has no parameters. Was it created properly?'
@@ -187,23 +196,50 @@ router.post('/generate', async (req, res) => {
         // Use proper GPT-4o parameter generation from weights.service.js
         console.log('🤖 Calling GPT-4o to generate 11-14 parameter categories...');
         console.log('   Target category:', targetCategory);
-        console.log('   User prompt:', userPrompt.substring(0, 100) + '...');
+        console.log('   User prompt:', userPrompt?.substring(0, 100) || 'N/A');
         
-        const generatedParams = await createParametersForCategory(targetCategory, userPrompt);
-        
-        console.log('✅ GPT-4o generated parameters:', Object.keys(generatedParams).length, 'categories');
-        
-        // Initialize session weights with generated parameters
-        const initResult = await initializeSessionWeights(sessionId, generatedParams, projectId);
-        console.log('💾 Initialized weights:', initResult.weightsCount, 'total weights');
+        try {
+          const generatedParams = await createParametersForCategory(targetCategory, userPrompt || '');
+          
+          if (!generatedParams || Object.keys(generatedParams).length === 0) {
+            console.error('❌ GPT-4o returned empty parameters!');
+            throw new Error('Failed to generate parameters');
+          }
+          
+          console.log('✅ GPT-4o generated parameters:', Object.keys(generatedParams).length, 'categories');
+          console.log('   Categories:', Object.keys(generatedParams).join(', '));
+          
+          // Initialize session weights with generated parameters
+          console.log('💾 Initializing session weights...');
+          const initResult = await initializeSessionWeights(sessionId, generatedParams, projectId);
+          
+          if (!initResult || !initResult.success) {
+            console.error('❌ Failed to initialize weights:', initResult?.error || 'Unknown error');
+            throw new Error('Failed to save parameters to database');
+          }
+          
+          console.log('✅ Initialized weights:', initResult.weightsCount, 'total weights');
+        } catch (paramError) {
+          console.error('❌ Parameter generation/initialization failed:', paramError);
+          console.error('   Stack:', paramError.stack);
+          
+          // Continue with empty parameters (will use defaults)
+          console.warn('⚠️ Continuing with empty parameters - generation may not learn properly');
+        }
         
         // Reload weights from database
+        console.log('🔄 Reloading weights from database...');
         const { data: freshWeights, error: reloadError } = await supabase
           .from('weight_parameters')
           .select('*')
           .eq('session_id', sessionId);
         
-        if (reloadError) throw reloadError;
+        if (reloadError) {
+          console.error('❌ Failed to reload weights:', reloadError);
+          throw reloadError;
+        }
+        
+        console.log('📦 Reloaded weights count:', freshWeights?.length || 0);
         
         // Group into parameters object
         parameters = {};
