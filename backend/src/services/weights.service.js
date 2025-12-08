@@ -45,58 +45,54 @@ export async function createParametersForCategory(category, userPrompt) {
     };
   }
   
-  // For other categories: use dynamic GPT-4o generation
+  // For other categories: use UNIVERSAL PARAMETERS for flexibility
   try {
-    const systemPrompt = `You are an AI parameter architect. Create a comprehensive parameter system for ${category} generation.
+    const systemPrompt = `You are an AI parameter architect for a GENERAL-PURPOSE content generation system.
+
+🎯 GOAL: Create UNIVERSAL parameters that work for ANY content category.
+
+WHY UNIVERSAL?
+- Users generate different content (cars, food, dating, insurance, real estate)
+- Learning must transfer between categories
+- Same parameters = accumulated experience across all sessions
 
 CRITICAL REQUIREMENTS:
-- Create EXACTLY 11-14 parameter categories
-- Each category must have 4-6 sub-parameters AS AN ARRAY
-- Total parameters: 44-84 (11*4 minimum, 14*6 maximum)
-- Parameters must be specific to ${category} context
-- Sub-parameters should be diverse and cover the full range of possibilities
+- Create EXACTLY 12 UNIVERSAL parameter categories
+- Each category must have 5-6 sub-parameters AS AN ARRAY
+- Total parameters: 60-72 (12*5 minimum, 12*6 maximum)
+- Parameters must be CONTENT-AGNOSTIC (work for anything)
+- Sub-parameters should be diverse and universal
 - IMPORTANT: Each category value MUST be an array of strings, NOT nested objects
 
-CORRECT FORMAT (use arrays):
+UNIVERSAL PARAMETER STRUCTURE (use this as base):
+
 {
-  "device": ["iPhone_14_Pro", "iPhone_13", "Pixel_7", "Samsung_S21"],
-  "platform": ["Instagram_Story", "Instagram_Feed", "Snapchat", "TikTok"]
+  "subject_type": ["person", "vehicle", "product", "food", "interior", "landscape"],
+  "composition": ["centered", "rule_of_thirds", "symmetrical", "asymmetric", "dynamic"],
+  "lighting": ["natural_soft", "golden_hour", "studio_bright", "dramatic_shadow", "evening", "backlit"],
+  "color_palette": ["warm_tones", "cool_tones", "vibrant", "muted", "monochrome", "pastel"],
+  "mood": ["professional", "casual", "dramatic", "playful", "elegant", "energetic"],
+  "setting": ["indoor", "outdoor", "urban", "nature", "studio", "minimal"],
+  "camera_angle": ["eye_level", "low_angle", "high_angle", "birds_eye", "worm_view"],
+  "depth_of_field": ["shallow_bokeh", "medium", "deep_focus", "selective", "tilt_shift"],
+  "visual_style": ["realistic", "artistic", "minimal", "luxury", "editorial", "candid"],
+  "time_of_day": ["morning", "afternoon", "golden_hour", "evening", "night", "blue_hour"],
+  "texture_quality": ["smooth", "rough", "glossy", "matte", "soft", "sharp"],
+  "framing": ["close_up", "medium_shot", "wide_shot", "extreme_close_up", "full_body"]
 }
 
-WRONG FORMAT (do NOT use nested objects):
-{
-  "device": {"option1": "iPhone_14_Pro", "option2": "iPhone_13"},
-  "platform": {"type": "Instagram"}
-}
+CONTEXT HINT: User is generating "${category}" content.
+- Adjust subject_type options to include relevant subjects (e.g., "vehicle" for automotive)
+- Keep all other parameters UNIVERSAL and content-agnostic
+- Do NOT create category-specific parameters like "vehicle_brand" or "food_type"
 
-EXAMPLES OF GOOD PARAMETER STRUCTURE:
+WHY THIS WORKS:
+✅ Cars: subject_type=vehicle, composition=centered, lighting=golden_hour
+✅ Food: subject_type=food, composition=rule_of_thirds, lighting=natural_soft
+✅ Dating: subject_type=person, mood=casual, setting=outdoor
+✅ Insurance: subject_type=vehicle, mood=professional, visual_style=realistic
 
-For "dating" category:
-{
-  "device": ["iPhone_14_Pro", "iPhone_13", "Pixel_7", "Samsung_S21", "iPhone_X"],
-  "platform": ["Instagram_Story", "Instagram_Feed", "Snapchat", "TikTok"],
-  "orientation": ["vertical_9_16", "square_1_1", "horizontal_16_9", "horizontal_4_3"],
-  "year": ["2024", "2023", "2022", "2021", "2020"],
-  "age": ["teen", "young_adult", "middle_aged", "mature"],
-  "gender": ["woman", "man", "non_binary", "diverse"],
-  "pose": ["front_camera_selfie", "mirror_selfie", "portrait_shot", "candid", "action"],
-  "expression": ["genuine_smile", "soft_smile", "serious", "laughing", "confident"],
-  "clothing": ["casual", "formal", "sporty", "trendy", "professional"],
-  "setting": ["indoor", "outdoor", "cafe", "bedroom", "gym", "park"],
-  "lighting": ["natural_window", "golden_hour", "studio", "evening", "mixed"],
-  "mood": ["casual", "professional", "romantic", "energetic", "relaxed"],
-  "color_tone": ["warm", "cool", "neutral", "vibrant"],
-  "saturation": ["low", "moderate", "high", "boosted"]
-}
-
-For "cars" category, create similar structure with:
-- Vehicle parameters (brand, model, color, condition)
-- Technical parameters (angle, shot_type, lens_type)
-- Environment parameters (location, weather, time_of_day)
-- Style parameters (artistic_style, color_grading, lighting)
-- etc.
-
-Return ONLY valid JSON with 11-14 categories, each having an ARRAY of 4-6 string options.`;
+Return ONLY valid JSON with 12 universal categories, each having an ARRAY of 5-6 options.`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
