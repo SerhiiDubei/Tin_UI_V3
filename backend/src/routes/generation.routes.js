@@ -1,6 +1,6 @@
 import express from 'express';
 import { supabase } from '../db/supabase.js';
-import { selectParametersWeighted, updateWeightsInstantly, initializeSessionWeights } from '../services/weights.service.js';
+import { selectParametersWeighted, updateWeightsInstantly, initializeSessionWeights, createParametersForCategory } from '../services/weights.service.js';
 import { buildPromptFromParameters } from '../services/agent.service.js';
 import { buildPromptHybrid } from '../services/agent-hybrid.service.js';
 import agentGeneral from '../services/agent-general.service.js';
@@ -141,16 +141,33 @@ router.post('/generate', async (req, res) => {
         console.log('   - Mode:', mode);
         console.log('   - Reference images:', modeInputs?.referenceImages?.length || 0);
         
-        // Create dynamic parameters based on input
-        const dynamicParams = await createDynamicParametersGeneral(
-          sessionId,
-          projectId,
-          userPrompt,
-          mode,
-          modeInputs
-        );
+        // Use proper GPT-4o parameter generation from weights.service.js
+        console.log('🤖 Calling GPT-4o to generate 11-14 parameter categories...');
+        const generatedParams = await createParametersForCategory(category || 'general', userPrompt);
         
-        parameters = dynamicParams;
+        console.log('✅ GPT-4o generated parameters:', Object.keys(generatedParams).length, 'categories');
+        
+        // Initialize session weights with generated parameters
+        const initResult = await initializeSessionWeights(sessionId, generatedParams, projectId);
+        console.log('💾 Initialized weights:', initResult.weightsCount, 'total weights');
+        
+        // Reload weights from database
+        const { data: freshWeights, error: reloadError } = await supabase
+          .from('weight_parameters')
+          .select('*')
+          .eq('session_id', sessionId);
+        
+        if (reloadError) throw reloadError;
+        
+        // Group into parameters object
+        parameters = {};
+        for (const w of freshWeights) {
+          if (!parameters[w.parameter_name]) {
+            parameters[w.parameter_name] = [];
+          }
+          parameters[w.parameter_name].push(w.sub_parameter);
+        }
+        
         console.log('✅ Created dynamic parameters:', Object.keys(parameters));
       }
     } else {
@@ -648,111 +665,7 @@ router.get('/unrated', async (req, res) => {
  * 🎨 Create Dynamic Parameters for General AI
  * Analyzes first generation input and creates relevant parameters
  */
-async function createDynamicParametersGeneral(sessionId, projectId, prompt, mode, modeInputs) {
-  console.log('🎯 Creating dynamic parameters for General AI session...');
-  console.log('   Session ID:', sessionId);
-  console.log('   Project ID:', projectId);
-  
-  const parameters = {};
-  
-  // 1. MODE parameter (always included)
-  parameters.mode = mode || 'text-to-image';
-  
-  // 2. Analyze prompt for style keywords
-  const promptLower = (prompt || '').toLowerCase();
-  
-  // Style detection
-  const styles = [];
-  if (promptLower.match(/\b(realistic|photo|photorealistic)\b/)) styles.push('realistic');
-  if (promptLower.match(/\b(artistic|painting|watercolor|oil painting)\b/)) styles.push('artistic');
-  if (promptLower.match(/\b(cartoon|anime|illustration|drawing)\b/)) styles.push('cartoon');
-  if (promptLower.match(/\b(3d|render|cgi)\b/)) styles.push('3d');
-  if (promptLower.match(/\b(minimalist|simple|clean)\b/)) styles.push('minimalist');
-  
-  if (styles.length > 0) {
-    parameters.style = styles[0]; // Primary style
-  } else {
-    parameters.style = 'realistic'; // Default
-  }
-  
-  // 3. Color scheme detection
-  const colors = [];
-  if (promptLower.match(/\b(vibrant|colorful|bright|saturated)\b/)) colors.push('vibrant');
-  if (promptLower.match(/\b(dark|moody|noir|black)\b/)) colors.push('dark');
-  if (promptLower.match(/\b(pastel|soft|light|gentle)\b/)) colors.push('pastel');
-  if (promptLower.match(/\b(monochrome|black and white|grayscale)\b/)) colors.push('monochrome');
-  if (promptLower.match(/\b(warm|orange|red|yellow)\b/)) colors.push('warm');
-  if (promptLower.match(/\b(cool|blue|cyan|cold)\b/)) colors.push('cool');
-  
-  if (colors.length > 0) {
-    parameters.color_scheme = colors[0];
-  } else {
-    parameters.color_scheme = 'natural';
-  }
-  
-  // 4. Subject type detection
-  if (promptLower.match(/\b(person|woman|man|portrait|face|people)\b/)) {
-    parameters.subject_type = 'portrait';
-  } else if (promptLower.match(/\b(landscape|nature|scenery|mountain|forest|beach)\b/)) {
-    parameters.subject_type = 'landscape';
-  } else if (promptLower.match(/\b(product|item|object)\b/)) {
-    parameters.subject_type = 'product';
-  } else if (promptLower.match(/\b(interior|room|office|house)\b/)) {
-    parameters.subject_type = 'interior';
-  } else {
-    parameters.subject_type = 'general';
-  }
-  
-  // 5. Mood detection
-  const moods = [];
-  if (promptLower.match(/\b(happy|joyful|cheerful|bright)\b/)) moods.push('happy');
-  if (promptLower.match(/\b(sad|melancholy|somber|dark)\b/)) moods.push('sad');
-  if (promptLower.match(/\b(dramatic|epic|cinematic|intense)\b/)) moods.push('dramatic');
-  if (promptLower.match(/\b(calm|peaceful|serene|relaxing)\b/)) moods.push('calm');
-  if (promptLower.match(/\b(energetic|dynamic|action)\b/)) moods.push('energetic');
-  
-  if (moods.length > 0) {
-    parameters.mood = moods[0];
-  } else {
-    parameters.mood = 'neutral';
-  }
-  
-  // 6. Reference images analysis
-  if (modeInputs?.referenceImages && modeInputs.referenceImages.length > 0) {
-    parameters.has_reference = 'yes';
-    parameters.reference_count = Math.min(modeInputs.referenceImages.length, 14).toString();
-  } else {
-    parameters.has_reference = 'no';
-    parameters.reference_count = '0';
-  }
-  
-  console.log('📊 Dynamic parameters created:');
-  console.log('   - mode:', parameters.mode);
-  console.log('   - style:', parameters.style);
-  console.log('   - color_scheme:', parameters.color_scheme);
-  console.log('   - subject_type:', parameters.subject_type);
-  console.log('   - mood:', parameters.mood);
-  console.log('   - has_reference:', parameters.has_reference);
-  console.log('   - reference_count:', parameters.reference_count);
-  
-  // 7. Save parameters to database
-  try {
-    console.log('💾 Saving parameters to weight_parameters table...');
-    console.log('📝 Parameters to save:', JSON.stringify(parameters, null, 2));
-    const result = await initializeSessionWeights(sessionId, projectId, parameters);
-    console.log('📊 Save result:', result);
-    if (result.success) {
-      console.log(`✅ Parameters saved successfully! (${result.weightsCount} weights)`);
-    } else {
-      console.error('❌ Failed to save parameters:', result.error);
-    }
-  } catch (error) {
-    console.error('❌ Failed to save parameters (exception):', error);
-    console.error('Error details:', error);
-    // Continue anyway - parameters will be used in-memory
-  }
-  
-  return parameters;
-}
+// createDynamicParametersGeneral() removed - now using proper GPT-4o generation
+// via createParametersForCategory() from weights.service.js
 
 export default router;
