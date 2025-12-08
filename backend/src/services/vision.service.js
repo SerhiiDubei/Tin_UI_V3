@@ -226,29 +226,38 @@ Analyze these ${photos.length} reference images as ADVERTISING/MARKETING CONTENT
 
 \`\`\`json
 {
-  "niche": "[Determine the business/product category: dating, e-commerce, beauty, fitness, real-estate, fashion, food, tech, travel, or other]",
-  "targetAudience": "[Who is this targeting? Examples: young adults 18-25, professionals 25-40, families with kids, students, retirees, etc.]",
+  "niche": "[Determine the business/product category: automotive_insurance, health_insurance, dating, e-commerce, beauty, fitness, real-estate, fashion, food, tech, travel, or other]",
+  "targetAudience": "[Who is this targeting? Examples: young adults 18-25, professionals 25-40, families with kids, students, retirees, young drivers, seniors, etc.]",
   "platform": "[Best platform based on style: Instagram, Facebook, TikTok, LinkedIn, Pinterest, or general]",
   "styleAnalysis": {
     "visualStyle": "[photography style, artistic approach]",
     "colorPalette": "[specific colors and mood]",
     "composition": "[framing, layout, focal points]",
-    "mood": "[emotional tone: aspirational, playful, professional, intimate, etc.]"
+    "mood": "[emotional tone: aspirational, playful, professional, intimate, trust, security, etc.]"
   },
   "photoDescriptions": [
-    "Photo 1: [Detailed description including subject, setting, style, notable elements]",
-    "Photo 2: [Detailed description...]"
+    "Photo 1: [EXTREMELY DETAILED description (100-150 words): subjects/products (exact models, colors, features), their exact positioning/poses, setting details (environment, background elements), composition (framing, angles), lighting quality (direction, intensity, color temperature), color palette (specific tones), mood/atmosphere, any text/logos visible, marketing elements (CTAs, overlays), overall advertising strategy. Be VERY SPECIFIC!]",
+    "Photo 2: [EXTREMELY DETAILED description (100-150 words)...]",
+    "Photo 3: [EXTREMELY DETAILED description (100-150 words)...]"
   ],
-  "generationPrompt": "[A comprehensive prompt for creating a NEW ad creative in this style]"
+  "generationPrompt": "[A comprehensive, EXTREMELY DETAILED prompt (200-400 words) for creating a NEW ad creative in this style. Include: exact subject/product details, setting/environment, composition, lighting specifics, color palette, mood, advertising elements (text overlays, CTAs), marketing psychology, target emotion, platform optimization]"
 }
 \`\`\`
 
-**GUIDELINES:**
-- **Niche**: Analyze products, subjects, settings to determine business type
-- **Target Audience**: Consider age, lifestyle, values shown in imagery
-- **Platform**: Instagram (lifestyle/visual), Facebook (broad/community), TikTok (young/dynamic), LinkedIn (professional), Pinterest (inspiration/crafts)
-- Be EXTREMELY DETAILED in photo descriptions
-- Generation prompt should capture the advertising intent and style`;
+**CRITICAL GUIDELINES:**
+- **Niche**: Be VERY SPECIFIC - not just "insurance" but "automotive_insurance" or "health_insurance". Not just "dating" but "dating_app_lifestyle" or "dating_professional"
+- **Target Audience**: Include demographics AND psychographics (lifestyle, values, pain points)
+- **Platform**: Match the visual style to platform best practices
+- **Photo Descriptions**: 100-150 WORDS EACH! Include:
+  * Exact products/subjects (car model, insurance type, person characteristics)
+  * Precise setting (urban street, home interior, studio setup)
+  * Detailed composition (centered, rule of thirds, angles)
+  * Specific lighting (golden hour, studio flash, natural window light)
+  * Exact colors (not "blue" but "corporate blue #0066CC" or "trust blue")
+  * Marketing elements (text overlays, CTAs, logos, badges)
+  * Emotional triggers (trust, security, excitement, peace of mind)
+- **Generation Prompt**: 200-400 WORDS! Capture the COMPLETE advertising strategy, not just visual elements
+- Remember: These are ADS, not just photos - include marketing psychology!`;
   } else if (agentType === 'general') {
     // GENERAL AI - ALWAYS use detailed per-photo analysis
     task = `**YOUR TASK:**

@@ -151,7 +151,7 @@ router.post('/generate', async (req, res) => {
         console.log('   - Reference images:', modeInputs?.referenceImages?.length || 0);
         
         // 🎯 INTELLIGENT CATEGORY DETECTION:
-        // Priority: Vision AI Category > Mode > Prompt Analysis > Project Tag
+        // Priority: Vision AI Category > Prompt Analysis > Mode > Project Tag
         let targetCategory = category; // Fallback to project tag
         
         // 1. Check if Vision AI already detected category (from modeInputs)
@@ -159,38 +159,74 @@ router.post('/generate', async (req, res) => {
           targetCategory = modeInputs.visionCategory;
           console.log('✅ Using Vision AI detected category:', targetCategory);
         }
-        // 2. Check if mode-specific parameters should be used
-        else if (mode && mode !== 'text-to-image') {
-          // For specialized modes, use mode-specific parameters
-          targetCategory = `mode_${mode}`;
-          console.log('✅ Using mode-based category:', targetCategory);
+        // 2. Check Vision AI analysis for niche (ad-replicator specific)
+        else if (modeInputs?.visionAnalysis?.analysis?.niche) {
+          // For ad-replicator, Vision AI detects the niche (e.g., 'automotive_insurance')
+          const detectedNiche = modeInputs.visionAnalysis.analysis.niche;
+          targetCategory = detectedNiche.replace(/[^a-z0-9_]/gi, '_').toLowerCase();
+          console.log('✅ Using Vision AI detected niche as category:', targetCategory);
         }
-        // 3. Try to detect category from prompt
+        // 3. Try to detect category from prompt (with more specific subcategories)
         else if (userPrompt) {
-          // Quick keyword-based detection for common categories
+          // Enhanced keyword-based detection with subcategories
           const promptLower = userPrompt.toLowerCase();
           
-          if (promptLower.match(/\b(insurance|coverage|policy|agent|claim)\b/)) {
+          // Insurance subcategories
+          if (promptLower.match(/\b(auto|car|vehicle)\b/) && promptLower.match(/\b(insurance|coverage|policy)\b/)) {
+            targetCategory = 'automotive_insurance';
+            console.log('✅ Detected automotive insurance category from prompt');
+          } else if (promptLower.match(/\b(health|medical|life)\b/) && promptLower.match(/\b(insurance|coverage|policy)\b/)) {
+            targetCategory = 'health_insurance';
+            console.log('✅ Detected health insurance category from prompt');
+          } else if (promptLower.match(/\b(home|house|property)\b/) && promptLower.match(/\b(insurance|coverage|policy)\b/)) {
+            targetCategory = 'home_insurance';
+            console.log('✅ Detected home insurance category from prompt');
+          } else if (promptLower.match(/\b(insurance|coverage|policy|agent|claim)\b/)) {
             targetCategory = 'insurance_advertising';
-            console.log('✅ Detected insurance category from prompt');
-          } else if (promptLower.match(/\b(car|vehicle|automotive|mercedes|bmw|toyota)\b/)) {
+            console.log('✅ Detected general insurance category from prompt');
+          }
+          // Automotive
+          else if (promptLower.match(/\b(car|vehicle|automotive|mercedes|bmw|toyota|sedan|suv|truck)\b/)) {
             targetCategory = 'automotive_advertising';
             console.log('✅ Detected automotive category from prompt');
-          } else if (promptLower.match(/\b(real estate|property|house|home|apartment)\b/)) {
+          }
+          // Real Estate
+          else if (promptLower.match(/\b(real estate|property|house|home|apartment)\b/)) {
             targetCategory = 'real_estate_advertising';
             console.log('✅ Detected real estate category from prompt');
-          } else if (promptLower.match(/\b(product|commercial|advertisement|marketing)\b/)) {
+          }
+          // Product
+          else if (promptLower.match(/\b(product|commercial|advertisement|marketing)\b/)) {
             targetCategory = 'product_advertising';
             console.log('✅ Detected product advertising from prompt');
-          } else if (promptLower.match(/\b(food|recipe|restaurant|dish|meal)\b/)) {
+          }
+          // Food & Beverage
+          else if (promptLower.match(/\b(food|recipe|restaurant|dish|meal)\b/)) {
             targetCategory = 'food_beverage';
             console.log('✅ Detected food category from prompt');
-          } else if (promptLower.match(/\b(music|instrument|guitar|piano|drum)\b/)) {
+          }
+          // Music
+          else if (promptLower.match(/\b(music|instrument|guitar|piano|drum)\b/)) {
             targetCategory = 'music';
             console.log('✅ Detected music category from prompt');
+          }
+          // Dating
+          else if (promptLower.match(/\b(dating|date|profile|match|swipe|relationship)\b/)) {
+            targetCategory = 'dating_lifestyle';
+            console.log('✅ Detected dating category from prompt');
+          }
+          // Fallback to mode-based if nothing detected
+          else if (mode && mode !== 'text-to-image') {
+            targetCategory = `mode_${mode}`;
+            console.log('ℹ️ Using mode-based category:', targetCategory);
           } else {
             console.log('ℹ️ Using fallback category:', targetCategory);
           }
+        }
+        // 4. Mode-based fallback (lowest priority)
+        else if (mode && mode !== 'text-to-image') {
+          targetCategory = `mode_${mode}`;
+          console.log('ℹ️ Using mode-based category as last resort:', targetCategory);
         }
         
         // Use proper GPT-4o parameter generation from weights.service.js
