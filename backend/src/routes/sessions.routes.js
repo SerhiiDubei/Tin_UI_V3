@@ -119,7 +119,7 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { projectId, userId, name, userPrompt } = req.body;
+    const { projectId, userId, name, userPrompt, useDynamicParameters } = req.body;
     
     if (!projectId || !userId) {
       return res.status(400).json({
@@ -165,7 +165,8 @@ router.post('/', async (req, res) => {
         user_id: userId,
         name: name || `Session ${nextNumber}`,
         session_number: nextNumber,
-        status: 'active'
+        status: 'active',
+        use_dynamic_parameters: useDynamicParameters || false
       }])
       .select()
       .single();

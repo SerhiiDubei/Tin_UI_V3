@@ -21,11 +21,6 @@ import { quickValidate } from '../services/qa-agent.service.js';
 
 const router = express.Router();
 
-// 🚩 FEATURE FLAG: Enable dynamic parameter extraction
-// Set to false to use universal parameters (safe default)
-// Set to true to use context-aware dynamic extraction (experimental)
-const USE_DYNAMIC_PARAMETERS = false; // ← Change to true for testing
-
 /**
  * GET /api/generation/models
  * Get available models for content generation
@@ -120,9 +115,13 @@ router.post('/generate', async (req, res) => {
     const category = project.tag;
     const agentType = category === 'dating' ? 'dating' : 'general';
     
+    // Read dynamic parameters flag from session (user choice)
+    const USE_DYNAMIC_PARAMETERS = session.use_dynamic_parameters || false;
+    
     console.log('📊 Context:');
     console.log('   Category:', category);
     console.log('   Agent:', agentType);
+    console.log('   Dynamic Parameters:', USE_DYNAMIC_PARAMETERS ? '✅ Enabled' : '❌ Disabled');
     
     // Get session parameters
     const { data: weights, error: weightsError } = await supabase

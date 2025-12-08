@@ -14,7 +14,10 @@ function SessionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newSession, setNewSession] = useState({ name: '' });
+  const [newSession, setNewSession] = useState({ 
+    name: '', 
+    useDynamicParameters: false 
+  });
   const { projectId } = useParams();
   const navigate = useNavigate();
 
@@ -54,7 +57,8 @@ function SessionsPage() {
       const response = await sessionsAPI.create({
         projectId: projectId,  // Backend очікує camelCase
         userId: user.id,       // Backend вимагає userId
-        name: newSession.name
+        name: newSession.name,
+        useDynamicParameters: newSession.useDynamicParameters || false
       });
 
       if (response.success) {
@@ -62,7 +66,7 @@ function SessionsPage() {
         const createdSession = response.data.session || response.data;
         setSessions([createdSession, ...sessions]);
         setShowCreateModal(false);
-        setNewSession({ name: '' });
+        setNewSession({ name: '', useDynamicParameters: false });
         
         // Navigate to generation page
         navigate(`/projects/${projectId}/sessions/${createdSession.id}/generate`);
@@ -268,9 +272,26 @@ function SessionsPage() {
                   className="form-input"
                   placeholder={`Наприклад: Сесія ${sessions.length + 1} - ${project.category}`}
                   value={newSession.name}
-                  onChange={(e) => setNewSession({ name: e.target.value })}
+                  onChange={(e) => setNewSession({ ...newSession, name: e.target.value })}
                   autoFocus
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="checkbox"
+                    checked={newSession.useDynamicParameters}
+                    onChange={(e) => setNewSession({ ...newSession, useDynamicParameters: e.target.checked })}
+                    style={{ width: 'auto', marginRight: '5px' }}
+                  />
+                  <span>
+                    🧪 Динамічні параметри (експериментально)
+                  </span>
+                </label>
+                <small style={{ display: 'block', marginTop: '5px', color: '#6b7280', fontSize: '0.875rem' }}>
+                  Параметри створюються на основі вашого контенту (фото, промпти) замість універсальних
+                </small>
               </div>
 
               <div className="info-box">
