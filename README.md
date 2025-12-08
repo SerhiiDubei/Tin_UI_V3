@@ -1,8 +1,56 @@
-# 🔥 Tin UI V3 - AI Content Generation Platform
+# 🔥 Tin UI V3 - Intelligent AI Content Generation Platform
 
-**Tinder-style AI feedback platform for content generation and optimization**
+> **AI-powered content generation that learns from your preferences through weighted parameter optimization**
 
-Modern full-stack application that generates AI content (images, videos, audio) and learns from user preferences through swipe-based feedback.
+Modern full-stack application with adaptive learning system that generates AI content (images, videos, audio) and continuously improves based on user feedback.
+
+[![Production](https://img.shields.io/badge/production-live-brightgreen)](https://tin-ui-v3.vercel.app)
+[![Version](https://img.shields.io/badge/version-3.1.0-blue)](https://github.com/SerhiiDubei/Tin_UI_V3)
+[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+
+---
+
+## 📚 Documentation
+
+- **[📖 Complete Documentation](./DOCUMENTATION.md)** - Full system documentation
+- **[🔌 API Reference](./API_REFERENCE.md)** - REST API endpoints
+- **[🗄️ Database Schema](./DATABASE_SCHEMA.md)** - Database structure
+- **[🐛 Known Bugs](./BUGS_FOUND.md)** - Testing results & issues
+
+---
+
+## ✨ What Makes This Special?
+
+### 🧠 Weighted Learning System
+Unlike other AI generators, Tin UI V3 **learns from your preferences**:
+- Each session has 44-84 weighted parameters
+- Parameters adjust based on your ratings (1-5 stars or swipe feedback)
+- Next generation uses learned weights for better results
+- New sessions inherit knowledge from previous sessions
+
+**Example:**
+```
+Session 1 → User likes "golden hour lighting" → Weight increases
+Session 2 → AI generates more "golden hour" photos automatically!
+```
+
+### 👁️ Vision AI Integration
+Upload 1-14 photos and AI analyzes them to:
+- Extract common style elements (lighting, composition, colors)
+- Generate detailed descriptions (100-150 words per photo)
+- Create comprehensive prompts (200-400 words)
+- Detect content category automatically (automotive, food, insurance, etc.)
+
+### 🎨 Multiple Specialized Agents
+- **Dating Agent** - Smartphone profile photos with 11 optimized parameters
+- **General Agent** - Universal agent for any content type
+- **Ad Replicator** - Analyzes competitor ads and generates new ones
+
+### 🆕 Dynamic Parameters (Experimental)
+Instead of generic parameters, extract specific ones from YOUR content:
+- **Generic**: `composition.centered`
+- **Dynamic**: `vehicle_positioning.front_3_4_angle` (for automotive)
+- **Result**: More precise learning, better quality
 
 ---
 
@@ -329,30 +377,99 @@ Tin_UI_V3/
 
 ---
 
-## 📝 License
+## 🧪 Testing & Bugs
 
-MIT License - Feel free to use for personal and commercial projects
+**Testing Report:** See [BUGS_FOUND.md](./BUGS_FOUND.md)
+
+**Test Coverage:**
+- ✅ 68 source files analyzed
+- ✅ 13 backend services tested
+- ✅ 7 API routes verified
+- ✅ Security scan complete
+
+**Known Issues:** 1 critical (database migration), 2 high priority  
+**Overall Health:** 🟢 GOOD - Production ready after migration
 
 ---
 
-## 👥 Contributing
+## 📈 Roadmap
+
+### v3.2.0 (Planned)
+- [ ] Rate limiting on API endpoints
+- [ ] Improved logging system
+- [ ] Analytics tracking for feature usage
+- [ ] UI/UX improvements for dynamic parameters
+
+### v3.3.0 (Future)
+- [ ] Video generation support
+- [ ] Audio generation integration
+- [ ] Multi-model comparison mode
+- [ ] Advanced weight visualization
+
+---
+
+## 🤝 Contributing
 
 Contributions welcome! Please:
-1. Fork the repository
-2. Create feature branch
-3. Commit changes
-4. Push to branch
-5. Open Pull Request
+1. Read [DOCUMENTATION.md](./DOCUMENTATION.md) first
+2. Fork the repository
+3. Create feature branch (`git checkout -b feature/AmazingFeature`)
+4. Commit changes (`git commit -m 'Add AmazingFeature'`)
+5. Push to branch (`git push origin feature/AmazingFeature`)
+6. Open Pull Request
+
+**Development Guidelines:**
+- Follow existing code style
+- Add tests for new features
+- Update documentation
+- Test thoroughly before PR
 
 ---
 
-## 📞 Support
+## 📞 Support & Resources
 
-For issues and questions:
-- Check `SETUP.md` for detailed configuration
-- Review backend logs for errors
+**Documentation:**
+- [📖 Complete Documentation](./DOCUMENTATION.md)
+- [🔌 API Reference](./API_REFERENCE.md)
+- [🗄️ Database Schema](./DATABASE_SCHEMA.md)
+
+**For Issues:**
+- Check [BUGS_FOUND.md](./BUGS_FOUND.md) for known issues
+- Review backend logs in Vercel dashboard
 - Check Supabase dashboard for database issues
+- Create GitHub issue with detailed description
+
+**Contact:**
+- GitHub: [@SerhiiDubei](https://github.com/SerhiiDubei)
+- Repository: [Tin_UI_V3](https://github.com/SerhiiDubei/Tin_UI_V3)
 
 ---
 
-**Built with ❤️ using React, Node.js, and AI**
+## 📄 License
+
+MIT License - Feel free to use for personal and commercial projects.
+
+See [LICENSE](./LICENSE) for details.
+
+---
+
+## 🙏 Acknowledgments
+
+**Built with:**
+- React 18 & TailwindCSS
+- Node.js & Express
+- Supabase (PostgreSQL)
+- OpenAI GPT-4o
+- GenSpark AI Platform
+
+**Special thanks to:**
+- OpenAI for GPT-4o Vision API
+- Supabase team for amazing platform
+- React community for excellent libraries
+
+---
+
+<p align="center">
+  <strong>Built with ❤️ by Serhii Dubei</strong><br>
+  <sub>Version 3.1.0 • Last Updated: 2025-12-08</sub>
+</p>
