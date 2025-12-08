@@ -164,10 +164,15 @@ export async function buildAdCreatives(userPrompt, referenceImages = [], additio
     const visionAnalysis = additionalContext.visionAnalysis;
     let photoDescriptions = '';
     
-    if (visionAnalysis && visionAnalysis.photoDescriptions) {
-      console.log('✅ Using Vision AI detailed photo descriptions');
+    // Check both paths: visionAnalysis.analysis.photoDescriptions (new) and visionAnalysis.photoDescriptions (old)
+    const photoDescs = visionAnalysis?.analysis?.photoDescriptions || visionAnalysis?.photoDescriptions;
+    
+    if (photoDescs && Array.isArray(photoDescs) && photoDescs.length > 0) {
+      console.log('✅ Using Vision AI detailed photo descriptions:', photoDescs.length, 'photos');
       photoDescriptions = '\n\n📸 DETAILED PHOTO ANALYSIS (from Vision AI):\n' +
-        visionAnalysis.photoDescriptions.map((desc, i) => `Photo ${i + 1}: ${desc}`).join('\n');
+        photoDescs.map((desc, i) => `Photo ${i + 1}: ${desc}`).join('\n');
+    } else {
+      console.warn('⚠️ Vision AI photo descriptions not found or empty');
     }
     
     // Build user message

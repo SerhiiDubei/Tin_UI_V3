@@ -51,10 +51,23 @@ export async function createParametersForCategory(category, userPrompt) {
 
 CRITICAL REQUIREMENTS:
 - Create EXACTLY 11-14 parameter categories
-- Each category must have 4-6 sub-parameters
+- Each category must have 4-6 sub-parameters AS AN ARRAY
 - Total parameters: 44-84 (11*4 minimum, 14*6 maximum)
 - Parameters must be specific to ${category} context
 - Sub-parameters should be diverse and cover the full range of possibilities
+- IMPORTANT: Each category value MUST be an array of strings, NOT nested objects
+
+CORRECT FORMAT (use arrays):
+{
+  "device": ["iPhone_14_Pro", "iPhone_13", "Pixel_7", "Samsung_S21"],
+  "platform": ["Instagram_Story", "Instagram_Feed", "Snapchat", "TikTok"]
+}
+
+WRONG FORMAT (do NOT use nested objects):
+{
+  "device": {"option1": "iPhone_14_Pro", "option2": "iPhone_13"},
+  "platform": {"type": "Instagram"}
+}
 
 EXAMPLES OF GOOD PARAMETER STRUCTURE:
 
@@ -83,7 +96,7 @@ For "cars" category, create similar structure with:
 - Style parameters (artistic_style, color_grading, lighting)
 - etc.
 
-Return ONLY valid JSON with 11-14 categories, each having 4-6 options.`;
+Return ONLY valid JSON with 11-14 categories, each having an ARRAY of 4-6 string options.`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -98,7 +111,28 @@ Return ONLY valid JSON with 11-14 categories, each having 4-6 options.`;
       temperature: 0.7
     });
 
-    const parameters = JSON.parse(response.choices[0].message.content);
+    let parameters = JSON.parse(response.choices[0].message.content);
+    
+    // 🔧 FIX: Normalize structure - convert nested objects to arrays
+    const normalizedParams = {};
+    for (const [cat, value] of Object.entries(parameters)) {
+      if (cat === 'metadata') continue; // Skip metadata if present
+      
+      if (Array.isArray(value)) {
+        // Already an array - good!
+        normalizedParams[cat] = value;
+      } else if (typeof value === 'object' && value !== null) {
+        // Nested object - extract values as array
+        console.warn(`⚠️ Category "${cat}" is nested object, extracting values...`);
+        normalizedParams[cat] = Object.values(value);
+      } else {
+        // Single value - wrap in array
+        console.warn(`⚠️ Category "${cat}" is single value, wrapping...`);
+        normalizedParams[cat] = [value];
+      }
+    }
+    
+    parameters = normalizedParams;
     
     // Validate structure
     const categoryCount = Object.keys(parameters).length;
@@ -108,6 +142,10 @@ Return ONLY valid JSON with 11-14 categories, each having 4-6 options.`;
     
     // Validate sub-parameters
     for (const [cat, options] of Object.entries(parameters)) {
+      if (!Array.isArray(options)) {
+        console.error(`❌ Category "${cat}" is not an array after normalization!`);
+        continue;
+      }
       if (options.length < 4 || options.length > 6) {
         console.warn(`⚠️ Category "${cat}" has ${options.length} options (should be 4-6)`);
       }
