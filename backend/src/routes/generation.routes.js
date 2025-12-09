@@ -11,6 +11,7 @@ import { buildPromptFromParameters } from '../services/agent.service.js';
 import { buildPromptHybrid } from '../services/agent-hybrid.service.js';
 import agentGeneral from '../services/agent-general.service.js';
 import agentAdReplicator from '../services/agent-ad-replicator.service.js';
+import { analyzeSessionHistory, buildAdaptiveSystemPrompt } from '../services/adaptive-learning.service.js';
 
 const { buildPromptGeneral } = agentGeneral;
 const { buildAdCreatives } = agentAdReplicator;
@@ -350,6 +351,19 @@ router.post('/generate', async (req, res) => {
     console.log('⚖️  Session has', Object.keys(parameters).length, 'parameter categories');
     }
     
+    // 🧠 ADAPTIVE LEARNING - Analyze session history BEFORE generation
+    console.log('\n🧠 Checking for learning insights...');
+    const sessionInsights = await analyzeSessionHistory(sessionId, 20);
+    
+    if (sessionInsights.success && sessionInsights.hasHistory) {
+      console.log('✅ Found insights from', sessionInsights.itemsAnalyzed, 'rated items');
+      console.log('   ❤️  Loves:', sessionInsights.insights?.loves?.length || 0);
+      console.log('   💔 Hates:', sessionInsights.insights?.hates?.length || 0);
+      console.log('   💡 Suggestions:', sessionInsights.insights?.suggestions?.length || 0);
+    } else {
+      console.log('ℹ️  No learning history yet (need ratings first)');
+    }
+    
     // 🚀 PARALLEL GENERATION - Generate all items simultaneously
     console.log(`\n🔥 Starting PARALLEL generation of ${count} items...`);
     
@@ -381,10 +395,11 @@ router.post('/generate', async (req, res) => {
               // 💝 Dating Photo Expert (existing agent)
               console.log(`🎨 Using Dating Photo Expert (Hybrid)`);
               promptResult = await buildPromptHybrid(
-              userPrompt,
-              agentType,
-              category,
-                sessionId
+                userPrompt,
+                agentType,
+                category,
+                sessionId,
+                sessionInsights  // 🧠 Pass insights for learning
               );
             } else if (mode === 'ad-replicator') {
               // 🎯 Ad Creative Replicator (special mode)
@@ -397,12 +412,14 @@ router.post('/generate', async (req, res) => {
                 userPrompt,
                 modeInputs.reference_images || [],
                 {
-                  niche: modeInputs.niche,
-                  targetAudience: modeInputs.target_audience,
-                  platform: modeInputs.platform,
+                  niche: modeInputs.niche || modeInputs.visionAnalysis?.analysis?.niche,
+                  targetAudience: modeInputs.target_audience || modeInputs.visionAnalysis?.analysis?.targetAudience,
+                  platform: modeInputs.platform || modeInputs.visionAnalysis?.analysis?.platform,
                   variations: count,  // Use count as number of variations
                   visionAnalysis: modeInputs.visionAnalysis  // 🆕 Pass Vision AI analysis
-                }
+                },
+                sessionId,
+                sessionInsights  // 🧠 Pass insights for adaptive learning
               );
               
               if (!adResult.success) {
@@ -439,7 +456,8 @@ router.post('/generate', async (req, res) => {
                 userPrompt,
                 mode,
                 modeInputs,
-                sessionId
+                sessionId,
+                sessionInsights  // 🧠 Pass insights for learning
               );
             }
             

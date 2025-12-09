@@ -111,7 +111,7 @@ Return ONLY the final prompt text, nothing else.`
       model: 'gpt-4o',
       messages: messages,
       temperature: 0.8,
-      max_tokens: 500
+      max_tokens: 1000
     });
     
     const duration = Date.now() - startTime;
