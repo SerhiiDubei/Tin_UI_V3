@@ -163,6 +163,61 @@ Analyze the generated prompt and provide detailed feedback on quality, adherence
    - If user comments mention "too perfect" → add more imperfections
    - If user likes "natural lighting" → emphasize in prompt
    - Weight patterns should influence parameter selection`;
+  } else if (agentType === 'ad-replicator') {
+    return basePrompt + `
+
+🔍 AD CREATIVE REPLICATOR VALIDATION RULES:
+
+1. **PROMPT LENGTH** (Critical)
+   - MUST be 200-400 words
+   - NOT short (50-100 words)
+   - Detailed, photographer-style description
+
+2. **COLOR SPECIFICATIONS** (Critical)
+   - MUST include hex codes (#FF5733, #2C3E50, etc.)
+   - Specify exact brand colors
+   - Match reference image palette
+
+3. **TEXT OVERLAYS** (Critical)
+   - MUST specify all text word-for-word
+   - Headlines, body copy, CTA buttons
+   - Exact placement and formatting
+
+4. **TECHNICAL SPECS** (Critical)
+   - Resolution: 2K or 4K explicitly stated
+   - Aspect ratio: Usually 1:1 for ad creatives
+   - Image quality: "high resolution", "professional quality"
+
+5. **LAYOUT & COMPOSITION** (Required)
+   - Describe exact layout from reference
+   - Element positioning (top-left, center, etc.)
+   - Visual hierarchy and balance
+
+6. **CONVERSION ELEMENTS** (Required)
+   - CTA preserved from reference
+   - Benefits/features highlighted
+   - Trust signals (testimonials, guarantees, etc.)
+
+7. **NICHE ADAPTATION** (Required)
+   - Tailored to specific niche (Dating, Teeth Whitening, etc.)
+   - Niche-specific language and imagery
+   - Target audience considerations
+
+8. **MODEL COMPATIBILITY**
+   - Nano Banana Pro: BEST for ad creatives with text
+   - Seedream 4: Good for realistic product shots
+   - FLUX Dev: Alternative for detailed text
+   - SDXL: Less suitable for legible text
+
+9. **CREATIVE STRATEGY** (Required)
+   - Replicate winning strategy, not pixels
+   - Maintain psychological hooks
+   - Preserve competitive advantages
+
+10. **ORIGINALITY** (Critical)
+   - MUST generate NEW imagery
+   - NOT copy/paste competitor visuals
+   - Fresh take on winning patterns`;
   } else {
     return basePrompt + `
 
@@ -254,6 +309,12 @@ ${recentComments.map((c, i) => `${i + 1}. [Rating: ${c.rating}] ${c.comment || '
 /**
  * Quick validation - lighter check without full analysis
  * Useful for batch validation or real-time checking
+ * 
+ * ENHANCED VERSION (2025-12-09):
+ * - Word count validation (200-400 words for detailed prompts)
+ * - Hex color code detection (#RRGGBB)
+ * - Resolution keywords (2K, 4K, 1080p, etc.)
+ * - Text overlay detection for Ad Replicator
  */
 export async function quickValidate(enhancedPrompt, agentType, model) {
   try {
@@ -261,6 +322,24 @@ export async function quickValidate(enhancedPrompt, agentType, model) {
     
     // Simple rule-based checks
     const issues = [];
+    
+    // Word count validation (200-400 words for detailed prompts)
+    const wordCount = enhancedPrompt.trim().split(/\s+/).length;
+    if (agentType === 'ad-replicator') {
+      if (wordCount < 200) {
+        issues.push({
+          type: 'structure_error',
+          severity: 'critical',
+          message: `Ad Replicator prompt too short (${wordCount} words, need 200-400)`
+        });
+      } else if (wordCount > 400) {
+        issues.push({
+          type: 'structure_error',
+          severity: 'minor',
+          message: `Ad Replicator prompt very long (${wordCount} words, recommended 200-400)`
+        });
+      }
+    }
     
     // Dating-specific quick checks
     if (agentType === 'dating') {
@@ -298,6 +377,45 @@ export async function quickValidate(enhancedPrompt, agentType, model) {
       }
     }
     
+    // Ad Replicator specific checks
+    if (agentType === 'ad-replicator') {
+      // Check for hex color codes
+      const hexColors = enhancedPrompt.match(/#[0-9A-Fa-f]{6}/g);
+      if (!hexColors || hexColors.length === 0) {
+        issues.push({
+          type: 'parameter_error',
+          severity: 'major',
+          message: 'Missing hex color codes (e.g., #FF5733). Ad creatives need specific colors.'
+        });
+      }
+      
+      // Check for resolution keywords
+      const resolutionKeywords = ['2k', '4k', '1080p', '2160p', 'high resolution', 'hd', 'uhd'];
+      const hasResolution = resolutionKeywords.some(keyword => 
+        enhancedPrompt.toLowerCase().includes(keyword)
+      );
+      if (!hasResolution) {
+        issues.push({
+          type: 'parameter_error',
+          severity: 'major',
+          message: 'Missing resolution specification (2K, 4K, etc.)'
+        });
+      }
+      
+      // Check for text overlay mentions
+      const textKeywords = ['text:', 'headline:', 'copy:', 'cta:', 'button:', 'overlay text'];
+      const hasTextOverlay = textKeywords.some(keyword => 
+        enhancedPrompt.toLowerCase().includes(keyword)
+      );
+      if (!hasTextOverlay) {
+        issues.push({
+          type: 'parameter_error',
+          severity: 'major',
+          message: 'Missing text overlay specification. Ad creatives need explicit text/headline.'
+        });
+      }
+    }
+    
     // General checks
     if (enhancedPrompt.length < 50) {
       issues.push({
@@ -307,11 +425,11 @@ export async function quickValidate(enhancedPrompt, agentType, model) {
       });
     }
     
-    if (enhancedPrompt.length > 2000) {
+    if (enhancedPrompt.length > 3000) {
       issues.push({
         type: 'structure_error',
         severity: 'minor',
-        message: 'Prompt very long (over 2000 characters)'
+        message: 'Prompt very long (over 3000 characters)'
       });
     }
     
@@ -324,7 +442,9 @@ export async function quickValidate(enhancedPrompt, agentType, model) {
         status,
         score,
         issues,
-        quickCheck: true
+        quickCheck: true,
+        wordCount, // Added for debugging
+        agentType // Added for debugging
       }
     };
     
