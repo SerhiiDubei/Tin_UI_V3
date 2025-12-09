@@ -412,14 +412,14 @@ router.post('/generate', async (req, res) => {
                 userPrompt,
                 modeInputs.reference_images || [],
                 {
-                  niche: modeInputs.niche,
-                  targetAudience: modeInputs.target_audience,
-                  platform: modeInputs.platform,
+                  niche: modeInputs.niche || modeInputs.visionAnalysis?.analysis?.niche,
+                  targetAudience: modeInputs.target_audience || modeInputs.visionAnalysis?.analysis?.targetAudience,
+                  platform: modeInputs.platform || modeInputs.visionAnalysis?.analysis?.platform,
                   variations: count,  // Use count as number of variations
                   visionAnalysis: modeInputs.visionAnalysis  // 🆕 Pass Vision AI analysis
                 },
                 sessionId,
-                sessionInsights  // 🧠 Pass insights for learning
+                sessionInsights  // 🧠 Pass insights for adaptive learning
               );
               
               if (!adResult.success) {

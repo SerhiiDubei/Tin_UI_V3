@@ -59,7 +59,7 @@ export async function validatePrompt(promptData) {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: validationPrompt }
       ],
-      max_tokens: 1500,
+      max_tokens: 3000,
       temperature: 0.3, // Lower temperature for consistent validation
       response_format: { type: "json_object" }
     });

@@ -113,7 +113,7 @@ export async function buildPromptGeneral(userPrompt, modeId = 'text-to-image', m
       model: 'gpt-4o',
       messages: messages,
       temperature: 0.8,
-      max_tokens: 800
+      max_tokens: 1600
     });
     
     const duration = Date.now() - startTime;

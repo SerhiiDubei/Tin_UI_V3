@@ -103,7 +103,7 @@ export async function buildPromptHybrid(userPrompt, agentType = 'general', categ
       model: 'gpt-4o',
       messages: messages,
       temperature: 0.85,  // Вище для креативності
-      max_tokens: 800
+      max_tokens: 1600
     });
     
     const duration = Date.now() - startTime;
