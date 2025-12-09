@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import config from '../config/index.js';
+import { analyzeSessionHistory, buildAdaptiveSystemPrompt } from './adaptive-learning.service.js';
 
 const openai = new OpenAI({
   apiKey: config.openai.apiKey
@@ -110,13 +111,25 @@ Design 3-5 new creative variations that:
 - Use COMPLETELY NEW imagery
 - Maintain conversion elements
 
-STEP 5: CRAFT PERFECT PROMPTS
-Your prompts must be hyper-detailed:
-[MAIN SUBJECT]: Describe what's in the image
-[LAYOUT]: Advertising structure (split, overlay, composition)
-[TEXT ELEMENTS]: ALL text that should appear with exact wording, placement, colors
-[VISUAL STYLE]: Photography type, lighting, mood, quality
-[TECHNICAL SPECS]: Resolution, realism level
+STEP 5: CRAFT PERFECT PROMPTS (200-400 WORDS MINIMUM)
+Your prompts must be EXTREMELY DETAILED like Dating Agent:
+[MAIN SUBJECT]: Complete description - exact pose, clothing, expressions, age, features
+[LAYOUT]: Exact advertising structure (split-screen, overlay, composition, rule of thirds)
+[TEXT ELEMENTS]: ALL text with EXACT wording, font style, size, placement, colors (hex codes)
+[VISUAL STYLE]: Specific photography type, lighting source & direction, mood, atmosphere
+[TECHNICAL SPECS]: Camera specs, resolution (2K/4K), realism level, depth of field
+[COLORS]: Exact color palette with hex codes (e.g., #0066CC, #FFB366)
+[BACKGROUND]: Detailed environment, setting, background elements
+[LIGHTING]: Specific source (golden hour, studio, natural), direction, quality
+
+🔴 CRITICAL: Each image_generation_prompt MUST be 200-400 words!
+Example GOOD prompt:
+"Metallic blue 2024 sedan positioned at 3/4 front angle in modern urban setting with glass buildings reflecting in glossy paint finish. Vehicle occupies right third of frame following rule of thirds. Golden hour lighting from right side (4PM sun angle approximately 30 degrees above horizon) creates warm highlights (#FFB366) on vehicle hood and roof, casting soft shadows (#1A1A2E) that enhance body curves and panel depth. Digital security shield icon (size: 80px, color: #00D4FF, glow effect) floating at mid-height near driver's door. Corporate trust blue (#0066CC) and clean white (#FFFFFF) color scheme dominates. Background: out-of-focus urban skyline with 5-6 modern glass buildings, slightly overexposed to create depth. Top text overlay: 'Protected Journey Ahead' in bold Montserrat font, 72pt, white color with subtle shadow. Bottom text: 'Tech Meets Trust' in 48pt, blue (#0066CC). Professional composition using rule of thirds, slight vignette effect on corners. Technical: 2K resolution (2048x2048), photorealistic rendering, shallow depth of field (f/2.8), high realism score 9/10."
+
+Example BAD prompt (TOO SHORT):
+"Blue sedan with shield icons. Trust-focused insurance ad. Corporate style."
+
+YOU MUST GENERATE DETAILED PROMPTS LIKE THE GOOD EXAMPLE!
 
 ✅ DO'S:
 1. ALWAYS Generate NEW Images (never reuse competitor photos)
@@ -153,11 +166,13 @@ You're not a thief, you're a strategist. You study what works, understand WHY it
  * @param {object} additionalContext - Niche, target audience, etc.
  * @returns {object} { success, variations: [{ prompt, strategy, params }] }
  */
-export async function buildAdCreatives(userPrompt, referenceImages = [], additionalContext = {}) {
+export async function buildAdCreatives(userPrompt, referenceImages = [], additionalContext = {}, sessionId = null, insights = null) {
   console.log('\n🎯 AD CREATIVE REPLICATOR');
   console.log('Reference Images:', referenceImages.length);
   console.log('User Prompt:', userPrompt);
+  console.log('🧠 Insights provided:', insights?.hasHistory ? 'YES' : 'NO');
   console.log('Context:', additionalContext);
+  console.log('Session ID:', sessionId);
   
   try {
     // Extract Vision AI analysis if available
@@ -225,13 +240,30 @@ IMPORTANT:
 - Match professional quality of references
 `;
 
+    // 🆕 ADAPTIVE LEARNING: Use provided insights or analyze session history
+    let systemPrompt = MASTER_PROMPT;
+    let learningResult = insights;  // Use provided insights first
+    
+    if (!learningResult && sessionId) {
+      // Fallback: analyze if not provided (backward compatibility)
+      console.log('🧠 Analyzing session history for adaptive learning...');
+      learningResult = await analyzeSessionHistory(sessionId, 20);
+    }
+    
+    if (learningResult?.success && learningResult?.hasHistory) {
+      console.log(`✅ Learning insights found (${learningResult.itemsAnalyzed} items analyzed)`);
+      systemPrompt = buildAdaptiveSystemPrompt(systemPrompt, learningResult);
+    } else if (sessionId) {
+      console.log('ℹ️ No rated content yet - using base system prompt');
+    }
+    
     console.log('⏳ Calling GPT-4o (ad replicator mode)...');
     const startTime = Date.now();
     
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: MASTER_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage }
       ],
       temperature: 0.8,

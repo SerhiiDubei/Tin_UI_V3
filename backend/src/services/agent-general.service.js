@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import config from '../config/index.js';
 import { supabase } from '../db/supabase.js';
 import { getMode, validateModeInputs } from '../config/generation-modes.js';
+import { analyzeSessionHistory, buildAdaptiveSystemPrompt } from './adaptive-learning.service.js';
 
 const openai = new OpenAI({
   apiKey: config.openai.apiKey
@@ -29,11 +30,12 @@ const openai = new OpenAI({
  * @param {string} sessionId - Session ID for learning (optional)
  * @returns {object} { prompt, parameters, model, metadata }
  */
-export async function buildPromptGeneral(userPrompt, modeId = 'text-to-image', modeInputs = {}, sessionId = null) {
+export async function buildPromptGeneral(userPrompt, modeId = 'text-to-image', modeInputs = {}, sessionId = null, insights = null) {
   console.log('\n🎨 BUILDING PROMPT (GENERAL PURPOSE AI)');
   console.log('Mode:', modeId);
   console.log('User Prompt:', userPrompt);
   console.log('Mode Inputs:', Object.keys(modeInputs));
+  console.log('🧠 Insights provided:', insights?.hasHistory ? 'YES' : 'NO');
   
   try {
     // 1. Get mode configuration
@@ -61,7 +63,23 @@ export async function buildPromptGeneral(userPrompt, modeId = 'text-to-image', m
       .eq('active', true)
       .single();
     
-    const systemPrompt = agentConfig?.system_prompt || getDefaultSystemPrompt();
+    let systemPrompt = agentConfig?.system_prompt || getDefaultSystemPrompt();
+    
+    // 🆕 ADAPTIVE LEARNING: Use provided insights or analyze session history
+    let learningResult = insights;  // Use provided insights first
+    
+    if (!learningResult && sessionId) {
+      // Fallback: analyze if not provided (backward compatibility)
+      console.log('🧠 Analyzing session history for adaptive learning...');
+      learningResult = await analyzeSessionHistory(sessionId, 20);
+    }
+    
+    if (learningResult?.success && learningResult?.hasHistory) {
+      console.log(`✅ Learning insights found (${learningResult.itemsAnalyzed} items analyzed)`);
+      systemPrompt = buildAdaptiveSystemPrompt(systemPrompt, learningResult);
+    } else if (sessionId) {
+      console.log('ℹ️ No rated content yet - using base system prompt');
+    }
     
     // 4. Load user preferences (if session exists)
     let preferences = [];
@@ -344,6 +362,28 @@ You specialize in creating detailed, optimized prompts for various image generat
 - Text-to-image generation
 - Style transfer and artistic transformations
 - Image editing and enhancement
+- Multi-reference combining
+- Object replacement and background changes
+
+Your goal is to transform user requests into detailed, specific prompts that maximize the quality and accuracy of AI-generated images.
+
+Key principles:
+- Be specific and detailed
+- Consider composition, lighting, style, and mood
+- Optimize for the target model's strengths
+- Use clear, descriptive language
+- Focus on what matters most for the task`;
+}
+
+// Export function for use in routes
+export default {
+  buildPromptGeneral
+};
+
+
+
+
+editing and enhancement
 - Multi-reference combining
 - Object replacement and background changes
 

@@ -20,10 +20,11 @@ const openai = new OpenAI({
  * Build prompt with HYBRID approach
  * @returns {Object} { prompt, parameters }  - parameters для weighted learning
  */
-export async function buildPromptHybrid(userPrompt, agentType = 'general', category = null, sessionId = null) {
+export async function buildPromptHybrid(userPrompt, agentType = 'general', category = null, sessionId = null, insights = null) {
   console.log('\n🔥 BUILDING PROMPT (HYBRID APPROACH)');
   console.log('Agent Type:', agentType);
   console.log('Category:', category);
+  console.log('🧠 Insights provided:', insights?.hasHistory ? 'YES' : 'NO');
   console.log('User Prompt:', userPrompt);
   
   try {
@@ -35,7 +36,20 @@ export async function buildPromptHybrid(userPrompt, agentType = 'general', categ
       .eq('active', true)
       .single();
     
-    const systemPrompt = agentConfig?.system_prompt || getDefaultSystemPrompt(agentType);
+    let systemPrompt = agentConfig?.system_prompt || getDefaultSystemPrompt(agentType);
+    
+    // 🆕 ADAPTIVE LEARNING: Analyze session history if есть ratings
+    if (sessionId) {
+      console.log('🧠 Analyzing session history for adaptive learning...');
+      const learningResult = await analyzeSessionHistory(sessionId, 20);
+      
+      if (learningResult.success && learningResult.hasHistory) {
+        console.log(`✅ Learning insights found (${learningResult.itemsAnalyzed} items analyzed)`);
+        systemPrompt = buildAdaptiveSystemPrompt(systemPrompt, learningResult);
+      } else if (learningResult.hasHistory === false) {
+        console.log('ℹ️ No rated content yet - using base system prompt');
+      }
+    }
     
     // 2. 🔥 Завантажити weighted preferences (guidance, не обмеження!)
     const preferences = await getWeightedPreferences(sessionId);
@@ -45,13 +59,27 @@ export async function buildPromptHybrid(userPrompt, agentType = 'general', categ
       console.log('Top 5:', preferences.slice(0, 5).map(p => `${p.parameter}.${p.value} (${Math.round(p.weight)})`));
     }
     
-    // 3. 🔥 Завантажити коментарі
-    const comments = await loadComments(sessionId);
+    // 3. 🔥 Use insights if provided, otherwise load comments (fallback)
+    let comments = [];
+    if (insights && insights.hasHistory && insights.insights) {
+      // Використовуємо structured insights з analyzeSessionHistory()
+      comments = [
+        { type: 'loves', items: insights.insights.loves || [] },
+        { type: 'hates', items: insights.insights.hates || [] },
+        { type: 'suggestions', items: insights.insights.suggestions || [] }
+      ];
+      console.log('🧠 Using structured insights (analyzed by GPT-4o)');
+      console.log('   ❤️  Loves:', insights.insights.loves?.length || 0);
+      console.log('   💔 Hates:', insights.insights.hates?.length || 0);
+      console.log('   💡 Suggestions:', insights.insights.suggestions?.length || 0);
+    } else {
+      // Fallback: завантажити raw comments (старий підхід)
+      comments = await loadComments(sessionId);
+      console.log('💬 Loaded raw comments (fallback):', comments?.length || 0);
+    }
     
-    console.log('💬 Loaded comments:', comments?.length || 0);
-    
-    // 4. 🔥 Build user message з preferences + comments
-    const userMessage = buildHybridMessage(userPrompt, preferences, comments, category);
+    // 4. 🔥 Build user message з preferences + comments/insights
+    const userMessage = buildHybridMessage(userPrompt, preferences, comments, category, insights);
     
     console.log('\n📝 HYBRID MESSAGE (first 400 chars):');
     console.log(userMessage.substring(0, 400) + '...\n');
@@ -183,9 +211,9 @@ async function loadComments(sessionId) {
 
 /**
  * Build hybrid user message
- * Preferences як guidance + comments як priority
+ * Preferences як guidance + comments/insights як priority
  */
-function buildHybridMessage(userPrompt, preferences, comments, category) {
+function buildHybridMessage(userPrompt, preferences, comments, category, insights = null) {
   const parts = [];
   
   parts.push(`🎯 USER REQUEST:\n${userPrompt}\n`);
@@ -218,8 +246,38 @@ function buildHybridMessage(userPrompt, preferences, comments, category) {
     parts.push('   - Mix preferred and new elements\n');
   }
   
-  // Comments (HIGHEST PRIORITY!)
-  if (comments && comments.length > 0) {
+  // 🧠 Structured Insights (HIGHEST PRIORITY!) - NEW APPROACH
+  if (insights && insights.hasHistory && insights.insights) {
+    parts.push(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    parts.push(`🧠 LEARNED USER PREFERENCES (from ${insights.itemsAnalyzed} rated items)`);
+    parts.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+    
+    const { loves, hates, suggestions } = insights.insights;
+    
+    if (loves && loves.length > 0) {
+      parts.push(`❤️  USER LOVES (incorporate these):`);
+      loves.forEach((item, i) => parts.push(`   ${i+1}. ${item}`));
+      parts.push('');
+    }
+    
+    if (hates && hates.length > 0) {
+      parts.push(`💔 USER HATES (AVOID these):`);
+      hates.forEach((item, i) => parts.push(`   ${i+1}. ${item}`));
+      parts.push('');
+    }
+    
+    if (suggestions && suggestions.length > 0) {
+      parts.push(`💡 ACTIONABLE SUGGESTIONS:`);
+      suggestions.forEach((item, i) => parts.push(`   ${i+1}. ${item}`));
+      parts.push('');
+    }
+    
+    parts.push(`⚠️  CRITICAL: Adapt generation to match these learned preferences!`);
+    parts.push(`Use the "loves", avoid the "hates", and follow the suggestions.\n`);
+    parts.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+  }
+  // Fallback: Raw comments (old approach)
+  else if (comments && comments.length > 0 && !insights) {
     parts.push(`💬 PREVIOUS USER COMMENTS (⚠️ HIGH PRIORITY!):\n`);
     
     for (const comment of comments.slice(0, 5)) {  // Top 5
