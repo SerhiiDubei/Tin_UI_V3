@@ -379,29 +379,3 @@ Key principles:
 export default {
   buildPromptGeneral
 };
-
-
-
-
-editing and enhancement
-- Multi-reference combining
-- Object replacement and background changes
-
-Your goal is to transform user requests into detailed, specific prompts that maximize the quality and accuracy of AI-generated images.
-
-Key principles:
-- Be specific and detailed
-- Consider composition, lighting, style, and mood
-- Optimize for the target model's strengths
-- Use clear, descriptive language
-- Focus on what matters most for the task`;
-}
-
-// Export function for use in routes
-export default {
-  buildPromptGeneral
-};
-
-
-
-
