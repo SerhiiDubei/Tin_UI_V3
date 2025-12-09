@@ -78,8 +78,9 @@ export async function uploadFromUrl(url, contentType, userId = 'anonymous') {
     // Generate unique filename
     const filename = `${userId}/${contentType}/${uuidv4()}${ext}`;
     
-    // Convert response to buffer
-    const buffer = await response.buffer();
+    // Convert response to buffer (using arrayBuffer instead of deprecated buffer())
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
     
     console.log(`📤 Uploading to Supabase Storage: ${filename}`);
     
